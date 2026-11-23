@@ -74,6 +74,8 @@ jobs:
         run: go vet -unsafeptr=false ./... # (C handles kept as uintptr, like the Win32 ones)
       - name: Tests (with the Mac's own Keychain, files and paths)
         run: go test -count=1 ./...
+      - name: What drawing costs here (Retina sizes)
+        run: ORBIT_DRAWBENCH=1 go test -count=1 -run TestDrawCosts -v . | grep DRAWCOST
       - name: Build Orbit.app (Apple Silicon + Intel)
         run: tools/mac/bundle.sh
       - name: Smoke test - start Orbit.app, drive its settings, talk to Apple Music, quit

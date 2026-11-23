@@ -261,6 +261,17 @@ void og_fill_path(OG *g, OPath *p, uint32_t c) {
 	if (p->winding) CGContextFillPath(g->ctx); else CGContextEOFillPath(g->ctx);
 }
 
+// og_fill_path_glow: the path filled with a soft glow around it (Core Graphics' own blurred
+// shadow — one pass, instead of stroking the outlines of every letter several times)
+void og_fill_path_glow(OG *g, OPath *p, uint32_t fill, uint32_t glow, float blur) {
+	CGContextSaveGState(g->ctx);
+	CGColorRef gc = color(glow);
+	CGContextSetShadowWithColor(g->ctx, CGSizeZero, blur, gc);
+	CGColorRelease(gc);
+	og_fill_path(g, p, fill);
+	CGContextRestoreGState(g->ctx);
+}
+
 void og_stroke_path(OG *g, OPath *p, OPen *pen) {
 	usePen(g, pen);
 	CGContextAddPath(g->ctx, p->p);
@@ -393,6 +404,13 @@ void og_draw_image(OG *g, OImg *o, float x, float y, float w, float h, float sx,
 	CGContextDrawImage(g->ctx, CGRectMake(0, 0, w, h), img);
 	CGContextRestoreGState(g->ctx);
 	CGImageRelease(img);
+}
+
+void og_draw_image_alpha(OG *g, OImg *o, float x, float y, float w, float h, float alpha) {
+	CGContextSaveGState(g->ctx);
+	CGContextSetAlpha(g->ctx, alpha);
+	og_draw_image(g, o, x, y, w, h, 0, 0, 0, 0, 0);
+	CGContextRestoreGState(g->ctx);
 }
 
 int og_save_png(OImg *o, const char *path) {

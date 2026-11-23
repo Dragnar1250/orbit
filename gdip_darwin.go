@@ -147,6 +147,13 @@ func gImage(g, img uintptr, x, y, w, h float32) {
 	C.og_draw_image(og(g), oimg(img), C.float(x), C.float(y), C.float(w), C.float(h), 0, 0, 0, 0, 0)
 }
 
+func gImageAlpha(g, img uintptr, x, y, w, h, alpha float32) {
+	if img == 0 {
+		return
+	}
+	C.og_draw_image_alpha(og(g), oimg(img), C.float(x), C.float(y), C.float(w), C.float(h), C.float(alpha))
+}
+
 func gImageSrc(g, img uintptr, x, y, w, h, sx, sy, sw, sh float32) {
 	if img == 0 {
 		return
@@ -287,6 +294,11 @@ func pathBounds(path uintptr) RectF {
 
 func fillPathColor(g, path uintptr, c uint32) { C.og_fill_path(og(g), opath(path), C.uint32_t(c)) }
 func drawPathPen(g, pen, path uintptr)        { C.og_stroke_path(og(g), opath(path), open_(pen)) }
+
+// fillPathGlow: the path with a blurred glow of colour glow around it (Mac only)
+func fillPathGlow(g, path uintptr, fill, glow uint32, blur float32) {
+	C.og_fill_path_glow(og(g), opath(path), C.uint32_t(fill), C.uint32_t(glow), C.float(blur))
+}
 
 func strokePath(g, path uintptr, c uint32, width float32) {
 	p := newPen(c, width)
