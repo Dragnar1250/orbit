@@ -107,7 +107,6 @@ set_opt ShowGlow false; set_opt FPS 60
 for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather; do set_opt $k false; done
 for k in ShowVinyl ShowHalo ShowLyrics; do set_opt $k true; measure "60 fps, only $k"; set_opt $k false; done
 for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather; do set_opt $k true; done
-(timeout 30 sample $PID 5 -mayDie -file /tmp/orbit-sample.txt >/dev/null 2>&1 && awk '/Sort by top of stack/,0' /tmp/orbit-sample.txt | head -40 | sed 's/^/PROFILE /') || echo "no profile"
 echo "memory after playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
 grep -E "audio:|desktop widgets" "$DIR/orbit.log" | tail -3
 grep -E "screen [0-9]+x" "$DIR/orbit.log" | tail -1
@@ -124,13 +123,18 @@ tail -5 "$DIR/orbit.log"
 PORT=$(grep -oE "settings window on 127.0.0.1:[0-9]+" "$DIR/orbit.log" | tail -1 | cut -d: -f2)
 BASE=http://127.0.0.1:${PORT:-47330}
 TOK=$(cat "$DIR/settings.key")
-set_opt FPS 60; measure "Retina pixels, 60 fps, all widgets"
+for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather; do set_opt $k true; done
+pprof_top() { sleep 13; [ -f "$1" ] && go tool pprof -top -cum -nodecount=60 "$1" 2>/dev/null | sed "s/^/PPROF $2 /"; }
+set_opt FPS 60; kill -USR1 $PID; measure "Retina pixels, 60 fps, all widgets"
+pprof_top /tmp/orbit-cpu-1.prof widgets
 set_opt ShowGlow true; measure "Retina pixels, 60 fps, all widgets + screen glow"
 set_opt ShowGlow false
 for s in 0 3 6 10 14 20 26; do set_opt LyricsStyle $s; sleep 1.5; alive "lyrics style $s at Retina size"; done
 for e in 0 1 2 3 4 5 6 7 8 9 10 11; do set_opt Effect $e; sleep 1; alive "lyrics effect $e at Retina size"; done
-set_opt Effect 1; set_opt FsKind 0; act fullscreen true; sleep 8; alive "full screen at Retina size"
+set_opt Effect 1; set_opt FsKind 0; act fullscreen true; sleep 4; kill -USR1 $PID; sleep 6; alive "full screen at Retina size"
 grep "perf:" "$DIR/orbit.log" | tail -1
+grep "full screen" "$DIR/orbit.log" | tail -3
+pprof_top /tmp/orbit-cpu-2.prof fullscreen
 act fullscreen false; sleep 1
 shot 11-retina
 act quit true; sleep 3

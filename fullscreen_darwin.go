@@ -59,9 +59,10 @@ func openFullscreen() {
 	f := &FullView{winW: W, winH: H, mon: m, last: time.Now(), ver: -1, lyrIdx: -3, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
 	// big screens: draw at about 1080p and stretch — each pixel costs, and 4K has four times as many
 	q := 1.0
-	if W*H > 2560*1600 { // Retina: about 2560×1600 worth of pixels, the GPU stretches the rest
-		q = math.Sqrt(2560 * 1600 / float64(W*H))
+	if W*H > 1920*1200 { // Retina: about 1920×1200 worth of pixels, the GPU stretches the rest
+		q = math.Sqrt(1920 * 1200 / float64(W*H))
 	}
+	f.maxQ = q
 	if !f.setupBuffers(q) {
 		f.free()
 		logf("full screen: out of memory for %dx%d", W, H)

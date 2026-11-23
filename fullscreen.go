@@ -42,6 +42,7 @@ type FullView struct {
 	perfAt   time.Time
 	scaleTmp []uint32 // the half-way image of the smooth background stretch
 	pendingQ float64  // a new frame scale to switch to before the next frame
+	maxQ     float64  // the largest frame scale it opened with (a Retina budget on the Mac)
 	glowKind int      // 1: a shadow + glow behind the centre piece (drawn with the background)
 	tiny     *Bitmap  // the cover squeezed to a few pixels (blurred background)
 	tinyK    string
@@ -146,24 +147,35 @@ func (f *FullView) measure(d time.Duration, now time.Time) {
 	f.perfAt = now
 	budget := 1000 / float64(max(30, cfg.FsFPS)) * 0.85
 	logf("full screen %dx%d drawn at %dx%d: %.1f ms a frame", f.winW, f.winH, f.W, f.H, f.frameMs)
-	if f.frameMs > budget*1.6 && f.q > 0.75 {
+	minQ := 0.75
+	if gpuUpscale {
+		minQ = 0.5 // the GPU stretches it smoothly (on a Retina screen: still one pixel per point)
+	}
+	if f.frameMs > budget*1.6 && f.q > minQ {
 		f.slowRuns++
 		if f.slowRuns >= 3 {
 			f.slowRuns = 0
-			nq := math.Max(0.75, f.q-0.125)
+			nq := math.Max(minQ, f.q-0.125)
 			logf("full screen: too slow here, drawing at %.0f%% from now on", nq*100)
 			f.pendingQ = nq
 		}
-	} else if f.frameMs < budget*0.45 && f.q < 1 { // plenty of time again: sharper
+	} else if f.frameMs < budget*0.45 && f.q < f.topQ() { // plenty of time again: sharper
 		f.slowRuns--
 		if f.slowRuns <= -3 {
 			f.slowRuns = 0
-			f.pendingQ = math.Min(1, f.q+0.15)
+			f.pendingQ = math.Min(f.topQ(), f.q+0.15)
 			logf("full screen: fast enough, drawing at %.0f%%", f.pendingQ*100)
 		}
 	} else {
 		f.slowRuns = 0
 	}
+}
+
+func (f *FullView) topQ() float64 {
+	if f.maxQ > 0 {
+		return f.maxQ
+	}
+	return 1
 }
 
 // perfToast: how fast frames are made on this PC (Q) — handy when something feels slow.

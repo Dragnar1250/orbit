@@ -19,11 +19,14 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"runtime/pprof"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 	"unsafe"
 )
@@ -405,6 +408,9 @@ func goStarted() {
 	clockView = newClockView()
 	weatherView = newWeatherView()
 	glowView = newGlowView()
+	if os.Getenv("ORBIT_PERF") != "" {
+		go profileOnSignal()
+	}
 	if os.Getenv("ORBIT_FAKE_PLAY") != "" {
 		go fakePlay() // the build machine's test: a song "plays" without Spotify
 	} else {
@@ -969,4 +975,24 @@ func otherDesktopWidgets() []RECT {
 		logf("macOS desktop widgets the lyrics avoid: %d %v", len(deskWidgets), deskWidgets)
 	}
 	return deskWidgets
+}
+
+// profileOnSignal (ORBIT_PERF=1, tests): kill -USR1 records 12 s of where the CPU goes to
+// /tmp/orbit-cpu-N.prof (go tool pprof -top reads it)
+func profileOnSignal() {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGUSR1)
+	for n := 1; ; n++ {
+		<-ch
+		f, err := os.Create(fmt.Sprintf("/tmp/orbit-cpu-%d.prof", n))
+		if err != nil {
+			continue
+		}
+		if pprof.StartCPUProfile(f) == nil {
+			time.Sleep(12 * time.Second)
+			pprof.StopCPUProfile()
+		}
+		f.Close()
+		logf("cpu profile %d written", n)
+	}
 }

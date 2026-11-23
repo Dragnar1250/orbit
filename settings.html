@@ -305,6 +305,8 @@ html[data-theme=light] input[type=range]{accent-color:var(--acc)}
 html[data-theme=light] .pill{background:#f0f0f4}
 .themebtn{margin-left:auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--line2);background:var(--card);display:grid;place-items:center;cursor:pointer;font-size:15px}
 .themebtn:hover{border-color:var(--acc)}
+/* pictures scrolled out of sight stop moving (and stop costing anything) */
+.offscreen,.offscreen *{animation-play-state:paused!important}
 </style>
 <script>try{const t=localStorage.getItem("orbitTheme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
@@ -1620,8 +1622,17 @@ function render(keepScroll) {
   s.append(...cur.build().filter(x => x != null));
   main.append(s);
   main.scrollTop = keepScroll ? y : 0;
+  watchMotion(s);
   updatePreview();
   updateSide();
+}
+
+// only what is on screen animates: tiles, cards and stages out of sight are paused
+const motionObs = "IntersectionObserver" in window ? new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle("offscreen", !e.isIntersecting)), { rootMargin: "80px" }) : null;
+function watchMotion(root) {
+  if (!motionObs) return;
+  motionObs.disconnect();
+  root.querySelectorAll(".tile,.card,.wbig,.fsstage,.sky,.place,.vis,.disc").forEach(el => motionObs.observe(el));
 }
 
 function showNow(n) {
