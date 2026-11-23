@@ -256,10 +256,13 @@ type VinylView struct {
 	playing  bool
 	bands    [nBands]float32
 	bass     float32
+	layerVer int // bumped when base / label are rebuilt (the Mac keeps them on the GPU)
 }
 
 func newVinylView() *VinylView {
-	return &VinylView{w: newWidget("vinyl", "Turntable"), last: time.Now(), version: -1, sx: 1, sy: 1, armT: 1}
+	v := &VinylView{w: newWidget("vinyl", "Turntable"), last: time.Now(), version: -1, sx: 1, sy: 1, armT: 1}
+	v.w.useSoft(0.5, false) // ambient light and the bass rings on the Mac's soft layer
+	return v
 }
 
 // Local layout (bottom-left corner): disc centre at (1.08R, 1.12R), list to the right.
@@ -404,6 +407,51 @@ func (v *VinylView) Update(now time.Time, snap MediaSnap, bands [nBands]float32,
 	v.draw()
 }
 
+// drawLayered (the Mac): the still picture and the label stay on the GPU, which turns the label;
+// a frame only redraws what moves with the music — the light and the bass rings (on the soft
+// layer, a quarter of the pixels), the groove light, the shine and the arm.
+func (v *VinylView) drawLayered() {
+	g := v.w.g()
+	R, cx, cy := float32(v.R), float32(v.cx), float32(v.cy)
+	gClear(g, 0) // (and the soft layer)
+	amb := cfg.AmbVinyl && cfg.AmbBright > 0
+	rings := cfg.DiscGlow > 0 && v.bass > 0.02
+	if (amb || rings) && softBegin(g) {
+		if amb { // under the still picture: only what is around the record shows
+			bass := float64(v.bass)
+			if !v.playing {
+				bass = 0
+			}
+			ambientBlobs(g, cx, cy, R*float32(1.62*cfg.AmbSize), v.ambT, bass, float32(v.sx))
+		}
+		if rings {
+			gc := accent()
+			if cfg.DiscStyle != discPicture && cfg.DiscStyle != discBlack {
+				gc = discColor()
+			}
+			a := math.Min(1, float64(v.bass)*1.4) * cfg.DiscGlow / 2
+			for i, wd := range []float32{0.16, 0.1, 0.05} {
+				strokeCircle(g, withAlpha(gc, a*[]float64{0.18, 0.3, 0.55}[i]), cx, cy, R*(1.0+wd/2), R*wd)
+			}
+		}
+		softEnd(g)
+	}
+	if cfg.GrooveLight {
+		v.drawGrooveLight(g)
+	}
+	if cfg.Shine {
+		fillPie(g, 0x14FFFFFF, cx-R, cy-R, 2*R, 2*R, -62, 34)
+		fillPie(g, 0x10FFFFFF, cx-R, cy-R, 2*R, 2*R, 118, 30)
+	}
+	if cfg.ShowArm {
+		v.drawArm(g)
+	}
+	v.w.present()
+	v.w.setBase(v.base, v.layerVer)
+	v.w.spin(v.label, v.layerVer, float64(cx), float64(cy), v.angle)
+	v.needFull = false
+}
+
 // discColor is the colour of coloured / splatter / marble / clear records.
 func discColor() uint32 {
 	switch cfg.DiscColorMode {
@@ -492,6 +540,7 @@ func (v *VinylView) buildLayers() {
 		}
 	}
 	v.needFull = true
+	v.layerVer++
 
 	v.base.Free()
 	v.base = newBitmap(v.w.w, v.w.h)
@@ -681,6 +730,10 @@ func (v *VinylView) drawList(g uintptr) {
 
 func (v *VinylView) draw() {
 	if v.w.canvas == nil || v.base == nil {
+		return
+	}
+	if v.w.gpuLayers() {
+		v.drawLayered()
 		return
 	}
 	g := v.w.g()
@@ -938,7 +991,11 @@ type HaloView struct {
 	last    time.Time
 }
 
-func newHaloView() *HaloView { return &HaloView{w: newWidget("halo", "Halo"), last: time.Now()} }
+func newHaloView() *HaloView {
+	h := &HaloView{w: newWidget("halo", "Halo"), last: time.Now()}
+	h.w.useSoft(0.5, false) // light and glow on the Mac's soft layer
+	return h
+}
 
 func (h *HaloView) Update(now time.Time, snap MediaSnap, bands [nBands]float32, bass float32, active bool, ui float64) {
 	dt := now.Sub(h.last).Seconds()
@@ -1085,6 +1142,8 @@ func (h *HaloView) draw(S int, bass float32) {
 		strokePath(g, bg, withAlpha(0xFFFFFFFF, 0.08*cfg.HaloBackdrop), 1)
 		freePath(bg)
 	}
+	// the light behind it goes on the Mac's soft layer (not over a dark card: that would hide it)
+	soft := cfg.HaloBackdrop <= 0 && softBegin(g)
 	if cfg.AmbHalo && cfg.AmbBright > 0 {
 		ambientBlobs(g, c, c, sz*float32(math.Min(0.42, 0.33*cfg.AmbSize)), h.ambT, float64(bass), 1)
 	}
@@ -1097,6 +1156,18 @@ func (h *HaloView) draw(S int, bass float32) {
 	}
 	if cfg.HaloGlow > 0 {
 		softGlow(g, c, c, r*1.55, withAlpha(ca, (0.16+0.3*float64(bass))*cfg.HaloGlow))
+	}
+	if soft {
+		softEnd(g)
+	}
+	// the wide faint glow pass of the bars: on the soft layer too
+	glowPass := func(pass int, draw func()) {
+		if pass == 0 && cfg.HaloBackdrop <= 0 && softBegin(g) {
+			draw()
+			softEnd(g)
+			return
+		}
+		draw()
 	}
 	// 8 pens from quiet to loud colour (+ wider, faint ones for the glow)
 	const steps = 8
@@ -1125,25 +1196,27 @@ func (h *HaloView) draw(S int, bass float32) {
 				if pass == 0 && cfg.HaloGlow <= 0 {
 					continue
 				}
-				var pens [steps]uintptr
-				for k := range pens {
-					col := mixColor(ca, cb, float64(k)/(steps-1))
-					if pass == 0 {
-						pens[k] = newPen(withAlpha(col, 0.22*math.Min(1, cfg.HaloGlow)), bw*2.6)
-					} else {
-						pens[k] = newPen(withAlpha(col, 0.95), bw)
+				glowPass(pass, func() {
+					var pens [steps]uintptr
+					for k := range pens {
+						col := mixColor(ca, cb, float64(k)/(steps-1))
+						if pass == 0 {
+							pens[k] = newPen(withAlpha(col, 0.22*math.Min(1, cfg.HaloGlow)), bw*2.6)
+						} else {
+							pens[k] = newPen(withAlpha(col, 0.95), bw)
+						}
 					}
-				}
-				for i := 0; i < n; i++ {
-					a := -math.Pi/2 + float64(i)/float64(n)*2*math.Pi
-					l := 2 + h.bars[i]*maxLen
-					k := int(math.Min(steps-1, float64(h.bars[i])*steps))
-					cs, sn := float32(math.Cos(a)), float32(math.Sin(a))
-					drawLinePen(g, pens[k], c+cs*rb, c+sn*rb, c+cs*(rb+l), c+sn*(rb+l))
-				}
-				for _, p := range pens {
-					freePen(p)
-				}
+					for i := 0; i < n; i++ {
+						a := -math.Pi/2 + float64(i)/float64(n)*2*math.Pi
+						l := 2 + h.bars[i]*maxLen
+						k := int(math.Min(steps-1, float64(h.bars[i])*steps))
+						cs, sn := float32(math.Cos(a)), float32(math.Sin(a))
+						drawLinePen(g, pens[k], c+cs*rb, c+sn*rb, c+cs*(rb+l), c+sn*(rb+l))
+					}
+					for _, p := range pens {
+						freePen(p)
+					}
+				})
 			}
 		} else { // Ring: a wobbling outline around the cover
 			pt := func(i int) (float32, float32) {
@@ -1155,15 +1228,17 @@ func (h *HaloView) draw(S int, bass float32) {
 				if pass == 0 && cfg.HaloGlow <= 0 {
 					continue
 				}
-				for i := 0; i < n; i++ {
-					x1, y1 := pt(i)
-					x2, y2 := pt(i + 1)
-					col := colAt(h.bars[i])
-					if pass == 0 {
-						col = withAlpha(col, 0.2*math.Min(1, cfg.HaloGlow))
+				glowPass(pass, func() {
+					for i := 0; i < n; i++ {
+						x1, y1 := pt(i)
+						x2, y2 := pt(i + 1)
+						col := colAt(h.bars[i])
+						if pass == 0 {
+							col = withAlpha(col, 0.2*math.Min(1, cfg.HaloGlow))
+						}
+						line(g, col, wd, x1, y1, x2, y2)
 					}
-					line(g, col, wd, x1, y1, x2, y2)
-				}
+				})
 			}
 			strokeCircle(g, withAlpha(ca, 0.35), c, c, rb+1, 1)
 		}
@@ -1230,19 +1305,21 @@ func (h *HaloView) draw(S int, bass float32) {
 			if pass == 0 && cfg.HaloGlow <= 0 {
 				continue
 			}
-			for side, sgn := range []float32{-1, 1} {
-				for i := 0; i+1 < m; i++ {
-					col := colAt(pts[i][1] / amp)
-					a := 1.0
-					if side == 1 {
-						a = 0.5
+			glowPass(pass, func() {
+				for side, sgn := range []float32{-1, 1} {
+					for i := 0; i+1 < m; i++ {
+						col := colAt(pts[i][1] / amp)
+						a := 1.0
+						if side == 1 {
+							a = 0.5
+						}
+						if pass == 0 {
+							a *= 0.18 * math.Min(1, cfg.HaloGlow)
+						}
+						line(g, withAlpha(col, a), wd, pts[i][0], c+sgn*pts[i][1], pts[i+1][0], c+sgn*pts[i+1][1])
 					}
-					if pass == 0 {
-						a *= 0.18 * math.Min(1, cfg.HaloGlow)
-					}
-					line(g, withAlpha(col, a), wd, pts[i][0], c+sgn*pts[i][1], pts[i+1][0], c+sgn*pts[i+1][1])
 				}
-			}
+			})
 		}
 	}
 	if cfg.HaloCard > 0 {
@@ -1391,7 +1468,9 @@ type LyricsView struct {
 }
 
 func newLyricsView() *LyricsView {
-	return &LyricsView{w: newWidget("lyrics", "Lyrics"), version: -1, idx: -2, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
+	lv := &LyricsView{w: newWidget("lyrics", "Lyrics"), version: -1, idx: -2, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
+	lv.w.useSoft(0.5, false) // the glows on the Mac's soft layer
+	return lv
 }
 
 func (lv *LyricsView) fontSize(ui float64) float64 {
@@ -2509,7 +2588,12 @@ func drawRun(g uintptr, r run, ox, oy float32, F float64, effect int) {
 	if r.haze > haze {
 		haze = r.haze
 	}
-	if haze > 0 { // the words sit in a haze that clears as they arrive (Dissolve, Scatter, Focus)
+	if haze > 0 && softBegin(g) { // (the Mac: one blurred fill on the soft layer)
+		fillPathColor(g, path, withAlpha(col, 0.5*float64(haze)))
+		softEnd(g)
+		softBlur(g, size*0.16*haze)
+		col = withAlpha(col, 1-0.8*float64(haze))
+	} else if haze > 0 { // the words sit in a haze that clears as they arrive (Dissolve, Scatter, Focus)
 		rr := size * 0.16 * haze
 		for i := 0; i < 6; i++ {
 			ang := float64(i) * math.Pi / 3
@@ -2579,8 +2663,14 @@ func drawEffect(g, path uintptr, col uint32, size float32, effect int) {
 	case fxSoftGlow:
 		drawGlowPath(g, path, col, col, size*0.22*amt, true)
 	case fxStrongGlow:
-		for i, wm := range []float32{1.0, 0.65, 0.35, 0.15} {
-			strokePath(g, path, withAlpha(col|0xFF000000, a*[]float64{0.07, 0.12, 0.2, 0.35}[i]*math.Min(1.5, float64(amt))), size*0.5*amt*wm+1)
+		if softBegin(g) { // the Mac: one blurred fill on the soft layer instead of four outlines
+			fillPathColor(g, path, withAlpha(col|0xFF000000, math.Min(1, a*0.8*math.Min(1.5, float64(amt)))))
+			softEnd(g)
+			softBlur(g, size*0.25*amt+1)
+		} else {
+			for i, wm := range []float32{1.0, 0.65, 0.35, 0.15} {
+				strokePath(g, path, withAlpha(col|0xFF000000, a*[]float64{0.07, 0.12, 0.2, 0.35}[i]*math.Min(1.5, float64(amt))), size*0.5*amt*wm+1)
+			}
 		}
 		fillPathColor(g, path, col)
 	case fxShadow:
@@ -2594,8 +2684,15 @@ func drawEffect(g, path uintptr, col uint32, size float32, effect int) {
 		fillPathColor(g, path, col)
 	case fxNeon:
 		acc := accent()
-		for i, wm := range []float32{1.0, 0.6, 0.3} {
-			strokePath(g, path, withAlpha(acc, a*[]float64{0.12, 0.22, 0.45}[i]), size*0.42*amt*wm+1)
+		if softBegin(g) {
+			fillPathColor(g, path, withAlpha(acc, a*0.8))
+			softEnd(g)
+			softBlur(g, size*0.21*amt+1)
+			strokePath(g, path, withAlpha(acc, a*0.45), size*0.42*amt*0.3+1) // the tube's crisp rim
+		} else {
+			for i, wm := range []float32{1.0, 0.6, 0.3} {
+				strokePath(g, path, withAlpha(acc, a*[]float64{0.12, 0.22, 0.45}[i]), size*0.42*amt*wm+1)
+			}
 		}
 		fillPathColor(g, path, withAlpha(mixColor(0xFFFFFFFF, acc, 0.25), a))
 	case fxGradient:
@@ -2623,6 +2720,13 @@ func drawEffect(g, path uintptr, col uint32, size float32, effect int) {
 		strokePath(g, path, col, size*0.045*amt+1.2)
 	case fxSoftBlur: // soft, slightly out-of-focus edges
 		r := size*0.035*amt + 1
+		if softBegin(g) {
+			fillPathColor(g, path, withAlpha(col, 0.6))
+			softEnd(g)
+			softBlur(g, r*1.3)
+			fillPathColor(g, path, withAlpha(col, 0.85))
+			return
+		}
 		for i := 0; i < 8; i++ {
 			ang := float64(i) * math.Pi / 4
 			dx, dy := r*float32(math.Cos(ang)), r*float32(math.Sin(ang))

@@ -19,7 +19,12 @@ static double tickHz;
 /* ---------- screens (Orbit works in pixels, y down from the top of the main screen) ---------- */
 
 static NSScreen *mainScreen(void) { return NSScreen.screens.count ? NSScreen.screens[0] : NSScreen.mainScreen; }
-double os_scale(void) { return mainScreen().backingScaleFactor ?: 1; }
+double os_scale(void) {
+	static double forced = -1; // ORBIT_SCALE=2: draw as many pixels as a Retina screen (tests)
+	if (forced < 0) { const char *e = getenv("ORBIT_SCALE"); forced = e ? atof(e) : 0; }
+	if (forced > 0) return forced;
+	return mainScreen().backingScaleFactor ?: 1;
+}
 static double mainTop(void) { return NSMaxY(mainScreen().frame); }
 
 static void toPx(NSRect r, double *out) {
@@ -126,16 +131,46 @@ void os_present_free(void **state) {
 
 /* ---------- widget windows ---------- */
 
+// A widget's window holds up to four pictures, bottom to top: the soft layer (glows and light,
+// drawn at a quarter of the pixels and stretched by the GPU), a still picture (the record without
+// its label), the turning label (turned by the GPU) and the main picture.
+enum { LSoft, LBase, LSpin, LMain, LCount };
+
+static CALayer *newLayer(void) {
+	CALayer *l = [CALayer layer];
+	NSNull *no = NSNull.null;
+	l.actions = @{@"contents": no, @"bounds": no, @"position": no, @"transform": no, @"hidden": no, @"opacity": no, @"frame": no, @"contentsScale": no};
+	l.contentsGravity = kCAGravityResize;
+	l.anchorPoint = CGPointMake(0.5, 0.5);
+	return l;
+}
+
 @interface OrbitWidgetView : NSView {
 @public
-	void *surfaces;
+	CALayer *layers[LCount];
+	void *surfaces[LCount];
+	int spinVer;
 }
 @property int wid;
 @end
 
 @implementation OrbitWidgetView
 - (BOOL)acceptsFirstMouse:(NSEvent *)e { return YES; }
-- (BOOL)isFlipped { return YES; }
+- (BOOL)isFlipped { return NO; } // layers in plain y-up geometry: pictures upright, positions converted
+- (CALayer *)part:(int)i {
+	if (!layers[i]) {
+		layers[i] = newLayer();
+		layers[i].zPosition = i;
+		layers[i].frame = self.layer.bounds;
+		[self.layer addSublayer:layers[i]];
+	}
+	return layers[i];
+}
+- (void)drop:(int)i {
+	if (layers[i]) { layers[i].contents = nil; layers[i].hidden = YES; }
+	os_present_free(&surfaces[i]);
+	if (i == LSpin) spinVer = 0;
+}
 - (void)mouseDown:(NSEvent *)e { goWidgetMouse(self.wid, e.clickCount >= 2 ? 6 : 1, 0); }
 - (void)mouseDragged:(NSEvent *)e { goWidgetMouse(self.wid, 2, 0); }
 - (void)mouseUp:(NSEvent *)e { goWidgetMouse(self.wid, 3, 0); }
@@ -167,7 +202,6 @@ void *ow_new(int wid) {
 	OrbitWidgetView *v = [[OrbitWidgetView alloc] initWithFrame:NSMakeRect(0, 0, 10, 10)];
 	v.wid = wid;
 	v.wantsLayer = YES;
-	v.layer.contentsGravity = kCAGravityResize;
 	v.layerContentsRedrawPolicy = NSViewLayerContentsRedrawNever;
 	w.contentView = v;
 	return (__bridge_retained void *)w;
@@ -187,10 +221,56 @@ void ow_show(void *wp, OG *g, double x, double y, double w, double h, double alp
 	double s = os_scale();
 	NSRect fr = NSMakeRect(x / s, mainTop() - (y + h) / s, w / s, h / s);
 	OrbitWidgetView *v = (OrbitWidgetView *)win.contentView;
-	os_present_layer((__bridge void *)v.layer, &v->surfaces, g, s);
 	if (!NSEqualRects(win.frame, fr)) [win setFrame:fr display:NO];
+	[CATransaction begin];
+	[CATransaction setDisableActions:YES];
+	CGRect b = CGRectMake(0, 0, w / s, h / s);
+	for (int i = 0; i < LCount; i++)
+		if (v->layers[i] && i != LSpin && !CGRectEqualToRect(v->layers[i].frame, b)) v->layers[i].frame = b;
+	if (g) {
+		CALayer *m = [v part:LMain];
+		m.hidden = NO;
+		os_present_layer((__bridge void *)m, &v->surfaces[LMain], g, s);
+	} else [v drop:LMain]; // (all of it is on the soft layer)
+	[CATransaction commit];
 	if (win.alphaValue != alpha) win.alphaValue = alpha;
 	if (!win.isVisible) [win orderFrontRegardless];
+}
+
+// ow_layer: picture g (k times the window's pixels) as layer i under the main one; NULL: none
+void ow_layer(void *wp, int i, OG *g, double k) {
+	OrbitWidgetView *v = (OrbitWidgetView *)((__bridge NSWindow *)wp).contentView;
+	[CATransaction begin];
+	[CATransaction setDisableActions:YES];
+	if (!g) [v drop:i];
+	else {
+		CALayer *l = [v part:i];
+		l.frame = v.layer.bounds;
+		l.hidden = NO;
+		os_present_layer((__bridge void *)l, &v->surfaces[i], g, os_scale() * k);
+	}
+	[CATransaction commit];
+}
+
+// ow_spin: picture g (sent again only when ver changes) centred at (cx, cy) pixels, turned by deg
+void ow_spin(void *wp, OG *g, int ver, double cx, double cy, double deg) {
+	OrbitWidgetView *v = (OrbitWidgetView *)((__bridge NSWindow *)wp).contentView;
+	double s = os_scale();
+	[CATransaction begin];
+	[CATransaction setDisableActions:YES];
+	if (!g) [v drop:LSpin];
+	else {
+		CALayer *l = [v part:LSpin];
+		l.hidden = NO;
+		if (v->spinVer != ver) {
+			v->spinVer = ver;
+			os_present_layer((__bridge void *)l, &v->surfaces[LSpin], g, s);
+			l.bounds = CGRectMake(0, 0, og_width(g) / s, og_height(g) / s);
+		}
+		l.position = CGPointMake(cx / s, v.layer.bounds.size.height - cy / s); // (y up here)
+		l.transform = CATransform3DMakeRotation(-deg * M_PI / 180, 0, 0, 1); // clockwise, as on Windows
+	}
+	[CATransaction commit];
 }
 
 void ow_move(void *wp, double x, double y) {
@@ -204,8 +284,10 @@ void ow_hide(void *wp) {
 	NSWindow *w = (__bridge NSWindow *)wp;
 	[w orderOut:nil];
 	OrbitWidgetView *v = (OrbitWidgetView *)w.contentView;
-	v.layer.contents = nil;
-	os_present_free(&v->surfaces); // hidden widgets keep no picture
+	[CATransaction begin];
+	[CATransaction setDisableActions:YES];
+	for (int i = 0; i < LCount; i++) [v drop:i]; // hidden widgets keep no pictures
+	[CATransaction commit];
 }
 void ow_mouse(void *wp, int on) { ((__bridge NSWindow *)wp).ignoresMouseEvents = !on; }
 void ow_close(void *wp) { NSWindow *w = (__bridge_transfer NSWindow *)wp; [w orderOut:nil]; [w close]; }

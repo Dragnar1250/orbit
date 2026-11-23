@@ -61,3 +61,5 @@ void og_text_path(OPath *p, OFont *f, const char *s, int n, float x, float y);
 void og_blend(OG *dst, OG *src, float x, float y, float alpha);
 void og_fill_path_glow(OG *g, OPath *p, uint32_t fill, uint32_t glow, float blur);
 void og_draw_image_alpha(OG *g, OImg *o, float x, float y, float w, float h, float alpha);
+void og_soft_begin(OG *s, OG *g, float k);
+void og_blur(OG *g, float radius);

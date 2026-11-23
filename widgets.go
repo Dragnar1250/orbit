@@ -771,6 +771,7 @@ func (gv *GlowView) Update(now time.Time, snap MediaSnap, bands [nBands]float32,
 			if n >= len(gv.parts) {
 				w := newWidget("glow", "Glow")
 				w.movable = false
+				w.useSoft(1, true) // the Mac: drawn at its points, not its Retina pixels
 				gv.parts = append(gv.parts, &glowPart{w: w})
 			}
 			p := gv.parts[n]
@@ -949,6 +950,7 @@ func (gv *GlowView) drawPart(p *glowPart, m RECT, wx, wy, T int) {
 	g := p.w.g()
 	gClear(g, 0)
 	gTranslate(g, -float32(wx), -float32(wy))
+	soft := softBegin(g)
 	win := RECT{int32(wx), int32(wy), int32(wx + p.w.w), int32(wy + p.w.h)}
 	for _, sd := range gv.sides() {
 		// draw every side that reaches into this window (the corners belong to top / bottom)
@@ -964,6 +966,9 @@ func (gv *GlowView) drawPart(p *glowPart, m RECT, wx, wy, T int) {
 	}
 	if cfg.GlowStyle == glEmbers {
 		gv.drawEmbers(g, p.mon, m, float32(T), win)
+	}
+	if soft {
+		softEnd(g)
 	}
 	gReset(g)
 	p.w.present()

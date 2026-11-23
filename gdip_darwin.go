@@ -8,13 +8,14 @@ package main
 
 /*
 #cgo CFLAGS: -fobjc-arc -Wno-deprecated-declarations
-#cgo LDFLAGS: -framework Cocoa -framework CoreText -framework ImageIO
+#cgo LDFLAGS: -framework Cocoa -framework CoreText -framework ImageIO -framework Accelerate
 #include <stdlib.h>
 #include "gdip_darwin.h"
 */
 import "C"
 
 import (
+	"math"
 	"unsafe"
 )
 
@@ -28,7 +29,12 @@ const (
 func gdipInit() bool { return true }
 func formats()       {}
 
-func og(g uintptr) *C.OG       { return (*C.OG)(unsafe.Pointer(g)) }
+func og(g uintptr) *C.OG {
+	if g == redirFrom && g != 0 { // between softBegin and softEnd: the soft layer
+		g = redirTo
+	}
+	return (*C.OG)(unsafe.Pointer(g))
+}
 func opath(p uintptr) *C.OPath { return (*C.OPath)(unsafe.Pointer(p)) }
 func open_(p uintptr) *C.OPen  { return (*C.OPen)(unsafe.Pointer(p)) }
 func oimg(i uintptr) *C.OImg   { return (*C.OImg)(unsafe.Pointer(i)) }
@@ -116,7 +122,12 @@ func (c *Canvas) Free() {
 
 /* ---------- state ---------- */
 
-func gClear(g uintptr, c uint32)           { C.og_clear(og(g), C.uint32_t(c)) }
+func gClear(g uintptr, c uint32) {
+	C.og_clear(og(g), C.uint32_t(c))
+	if redirFrom == 0 {
+		softClear(g) // a cleared widget starts with an empty soft layer too
+	}
+}
 func gTranslate(g uintptr, dx, dy float32) { C.og_translate(og(g), C.float(dx), C.float(dy)) }
 func gRotate(g uintptr, deg float32)       { C.og_rotate(og(g), C.float(deg)) }
 func gScale(g uintptr, sx, sy float32)     { C.og_scale(og(g), C.float(sx), C.float(sy)) }
@@ -333,8 +344,23 @@ func radialFill(g uintptr, cx, cy, rx, ry float32, center, surround uint32) {
 	C.og_radial(og(g), C.float(cx), C.float(cy), C.float(rx), C.float(ry), C.uint32_t(center), C.uint32_t(surround))
 }
 
-// drawGlowPath fills a path with an optional soft glow + drop shadow (as on Windows).
+// drawGlowPath fills a path with an optional soft glow + drop shadow (as on Windows). With a soft
+// layer the glow is one blurred fill there instead of three outlines of every letter here.
 func drawGlowPath(g, path uintptr, fill uint32, glow uint32, glowAmt float32, shadow bool) {
+	if (shadow || glowAmt > 0) && softBegin(g) {
+		if shadow {
+			gTranslate(g, 0, 2)
+			fillPathColor(g, path, argb(uint8(float64(fill>>24)*0.45), 0, 0, 0))
+			gTranslate(g, 0, -2)
+		}
+		if glowAmt > 0 {
+			fillPathColor(g, path, withAlpha(glow|0xFF000000, math.Min(1, float64(glow>>24)/255*0.85)))
+		}
+		softEnd(g)
+		softBlur(g, float32(math.Max(2, float64(glowAmt)*0.45)))
+		fillPathColor(g, path, fill)
+		return
+	}
 	if shadow {
 		gTranslate(g, 0, 2)
 		fillPathColor(g, path, argb(uint8(float64(fill>>24)*0.45), 0, 0, 0))

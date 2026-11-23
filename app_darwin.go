@@ -48,7 +48,19 @@ type Widget struct {
 	dragging     bool
 	offscreen    bool
 	ox, oy       int
+	// the soft layer under the main picture (see softBegin) and the turning label
+	softK     float64 // its size per point (0: none)
+	softOnly  bool    // everything is drawn on the soft layer (the screen glow)
+	soft      *Canvas
+	softUsed  bool
+	softShown bool
+	softBlurR float32
+	baseVer   int
+	spinShown bool
 }
+
+// canvasOwner: which widget a canvas belongs to (softBegin gets only the canvas)
+var canvasOwner = map[uintptr]*Widget{}
 
 var (
 	widgets  = map[int]*Widget{}
@@ -69,9 +81,105 @@ func (w *Widget) resize(width, height int) {
 	if w.canvas != nil && w.w == width && w.h == height {
 		return
 	}
+	if w.canvas != nil {
+		delete(canvasOwner, w.canvas.g)
+	}
 	w.canvas.Free()
-	w.canvas = newCanvas(width, height)
+	if w.softOnly { // nothing is drawn on the main canvas: keep it tiny
+		w.canvas = newCanvas(1, 1)
+	} else {
+		w.canvas = newCanvas(width, height)
+	}
 	w.w, w.h = width, height
+	if w.canvas != nil {
+		canvasOwner[w.canvas.g] = w
+	}
+	w.soft.Free()
+	w.soft = nil
+}
+
+// useSoft: this widget draws its glows and light on a soft layer of k times its size per point
+// (0.5: half the points — a quarter of the pixels of a Retina screen, 1: the points).
+func (w *Widget) useSoft(k float64, only bool) {
+	w.softK = k
+	w.softOnly = only
+}
+
+// softBegin: until softEnd, what is drawn on g goes to the soft layer instead (same place,
+// transform and clip, far fewer pixels). False (and nothing changes) where there is none.
+var redirFrom, redirTo uintptr
+
+func softBegin(g uintptr) bool {
+	w := canvasOwner[g]
+	if w == nil || w.softK <= 0 || redirFrom != 0 {
+		return false
+	}
+	k := math.Min(1, w.softK/float64(C.os_scale())) // per pixel of this screen
+	sw, sh := int(math.Ceil(float64(w.w)*k)), int(math.Ceil(float64(w.h)*k))
+	if w.soft == nil || w.soft.w != sw || w.soft.h != sh {
+		w.soft.Free()
+		w.soft = newCanvas(sw, sh)
+		if w.soft == nil {
+			return false
+		}
+	}
+	C.og_soft_begin(og(w.soft.g), og(g), C.float(float64(sw)/float64(w.w)))
+	w.softUsed = true
+	redirFrom, redirTo = g, w.soft.g
+	return true
+}
+
+func softEnd(g uintptr) {
+	if redirFrom == g {
+		redirFrom, redirTo = 0, 0
+	}
+}
+
+// softBlur: blur this frame's soft layer by r canvas pixels when it is shown
+func softBlur(g uintptr, r float32) {
+	if w := canvasOwner[g]; w != nil && w.soft != nil && r > w.softBlurR {
+		w.softBlurR = r
+	}
+}
+
+// softClear: an empty soft layer (widgets that don't clear their canvas every frame)
+func softClear(g uintptr) {
+	if w := canvasOwner[g]; w != nil && w.soft != nil {
+		C.og_clip_reset(og(w.soft.g))
+		C.og_clear(og(w.soft.g), 0)
+		w.softUsed = false
+	}
+}
+
+// gpuLayers: the Mac turns the record's label and keeps its still picture on the GPU
+func (w *Widget) gpuLayers() bool { return !w.offscreen }
+
+// setBase: the widget's still picture (under the label and the main picture), sent when ver changes
+func (w *Widget) setBase(b *Bitmap, ver int) {
+	if b == nil {
+		if w.baseVer != 0 {
+			C.ow_layer(unsafe.Pointer(w.win), 1, nil, 1)
+			w.baseVer = 0
+		}
+		return
+	}
+	if ver != w.baseVer {
+		w.baseVer = ver
+		C.ow_layer(unsafe.Pointer(w.win), 1, og(b.g), 1)
+	}
+}
+
+// spin: picture b turned by deg around (cx, cy), by the GPU (b is sent again when ver changes)
+func (w *Widget) spin(b *Bitmap, ver int, cx, cy, deg float64) {
+	if b == nil {
+		if w.spinShown {
+			C.ow_spin(unsafe.Pointer(w.win), nil, 0, 0, 0, 0)
+			w.spinShown = false
+		}
+		return
+	}
+	w.spinShown = true
+	C.ow_spin(unsafe.Pointer(w.win), og(b.g), C.int(ver), C.double(cx), C.double(cy), C.double(deg))
 }
 
 func (w *Widget) g() uintptr {
@@ -100,7 +208,22 @@ func (w *Widget) present() {
 		return
 	}
 	C.ow_level(unsafe.Pointer(w.win), C.int(w.level()))
-	C.ow_show(unsafe.Pointer(w.win), og(w.canvas.g), C.double(w.x), C.double(w.y), C.double(w.w), C.double(w.h), C.double(float64(w.outAlpha())/255))
+	if w.softOnly {
+		C.ow_show(unsafe.Pointer(w.win), nil, C.double(w.x), C.double(w.y), C.double(w.w), C.double(w.h), C.double(float64(w.outAlpha())/255))
+	} else {
+		C.ow_show(unsafe.Pointer(w.win), og(w.canvas.g), C.double(w.x), C.double(w.y), C.double(w.w), C.double(w.h), C.double(float64(w.outAlpha())/255))
+	}
+	if w.soft != nil && w.softUsed {
+		if w.softBlurR > 0 {
+			C.og_blur(og(w.soft.g), C.float(float64(w.softBlurR)*float64(w.soft.w)/float64(w.w)))
+		}
+		C.ow_layer(unsafe.Pointer(w.win), 0, og(w.soft.g), C.double(float64(w.soft.w)/float64(w.w)))
+		w.softShown = true
+	} else if w.softShown {
+		C.ow_layer(unsafe.Pointer(w.win), 0, nil, 1)
+		w.softShown = false
+	}
+	w.softBlurR = 0
 	w.visible = true
 }
 
@@ -112,18 +235,23 @@ func (w *Widget) hide() {
 		return
 	}
 	if w.visible {
-		C.ow_hide(unsafe.Pointer(w.win))
+		C.ow_hide(unsafe.Pointer(w.win)) // (its pictures go with it)
 		w.visible = false
+		w.softShown, w.spinShown, w.baseVer = false, false, 0
 	}
 }
 
 func (w *Widget) release() {
 	w.hide()
 	if w.canvas != nil {
+		delete(canvasOwner, w.canvas.g)
 		w.canvas.Free()
 		w.canvas = nil
 		w.w, w.h = 0, 0
 	}
+	w.soft.Free()
+	w.soft = nil
+	w.softShown, w.spinShown, w.baseVer = false, false, 0
 }
 
 func (w *Widget) moveTo(x, y int) {

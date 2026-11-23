@@ -4,6 +4,7 @@
 #import <Cocoa/Cocoa.h>
 #import <CoreText/CoreText.h>
 #import <ImageIO/ImageIO.h>
+#import <Accelerate/Accelerate.h>
 #include "gdip_darwin.h"
 
 struct OG {
@@ -140,6 +141,43 @@ void og_clip_reset(OG *g) {
 	CFArrayRemoveAllValues(g->clips);
 	CFArrayRemoveAllValues(g->eoClips);
 	og_apply(g);
+}
+
+// og_soft_begin: get canvas s (k times the size of g) ready to take g's drawing — g's transform
+// and clip, scaled by k. Used for the soft layer under a widget: glows and light that look the
+// same drawn at a quarter of the pixels and stretched by the GPU.
+void og_soft_begin(OG *s, OG *g, float k) {
+	CGAffineTransform K = CGAffineTransformMakeScale(k, k);
+	s->T = CGAffineTransformConcat(g->T, K);
+	CFArrayRemoveAllValues(s->clips);
+	CFArrayRemoveAllValues(s->eoClips);
+	for (int pass = 0; pass < 2; pass++) {
+		CFArrayRef from = pass ? g->eoClips : g->clips;
+		for (CFIndex i = 0; i < CFArrayGetCount(from); i++) {
+			CGPathRef c = CGPathCreateCopyByTransformingPath((CGPathRef)CFArrayGetValueAtIndex(from, i), &K);
+			CFArrayAppendValue(pass ? s->eoClips : s->clips, c);
+			CGPathRelease(c);
+		}
+	}
+	s->copyMode = 0;
+	s->interp = 3;
+	og_apply(s);
+}
+
+// og_blur: blur the whole canvas (three box blurs ≈ a gaussian of that radius, in pixels)
+void og_blur(OG *g, float radius) {
+	if (radius < 0.75f) return;
+	uint32_t k = (uint32_t)lroundf(radius * 1.16f) | 1; // 3 box passes of this width ≈ gaussian sigma radius/1.6
+	if (k < 3) k = 3;
+	vImage_Buffer a = {g->bits, (vImagePixelCount)g->h, (vImagePixelCount)g->w, (size_t)g->w * 4};
+	void *tmp = malloc((size_t)g->w * g->h * 4);
+	if (!tmp) return;
+	vImage_Buffer b = {tmp, (vImagePixelCount)g->h, (vImagePixelCount)g->w, (size_t)g->w * 4};
+	vImageBoxConvolve_ARGB8888(&a, &b, NULL, 0, 0, k, k, NULL, kvImageEdgeExtend);
+	vImageBoxConvolve_ARGB8888(&b, &a, NULL, 0, 0, k, k, NULL, kvImageEdgeExtend);
+	vImageBoxConvolve_ARGB8888(&a, &b, NULL, 0, 0, k, k, NULL, kvImageEdgeExtend);
+	memcpy(g->bits, tmp, (size_t)g->w * g->h * 4);
+	free(tmp);
 }
 
 void og_clear(OG *g, uint32_t argb) {
@@ -399,6 +437,11 @@ void og_draw_image(OG *g, OImg *o, float x, float y, float w, float h, float sx,
 		if (!img) return;
 	}
 	CGContextSaveGState(g->ctx);
+	if (g->interp < 7) { // drawn at about its own size (turned or not): the cheap filter looks the same
+		CGAffineTransform m = CGContextGetCTM(g->ctx);
+		double sx = sqrt(m.a * m.a + m.b * m.b) * w / CGImageGetWidth(img), sy = sqrt(m.c * m.c + m.d * m.d) * h / CGImageGetHeight(img);
+		if (sx > 0.8 && sx < 1.25 && sy > 0.8 && sy < 1.25) CGContextSetInterpolationQuality(g->ctx, kCGInterpolationLow);
+	}
 	CGContextTranslateCTM(g->ctx, x, y + h); // images are drawn bottom-up: flip back for this one
 	CGContextScaleCTM(g->ctx, 1, -1);
 	CGContextDrawImage(g->ctx, CGRectMake(0, 0, w, h), img);

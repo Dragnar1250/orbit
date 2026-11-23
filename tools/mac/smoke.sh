@@ -73,6 +73,9 @@ set_opt Motion 1; sleep 6; alive "playing with everything on"
 shot 06-playing
 for s in 0 1 2 3 4 5; do set_opt HaloStyle $s; sleep 1; alive "visualizer style $s while playing"; done
 shot 07-visualizer
+for e in 0 1 2 3 4 5 6 7 8 9 10 11; do set_opt Effect $e; sleep 0.6; alive "lyrics effect $e"; done
+set_opt Effect 2; sleep 2; shot 07b-strong-glow
+set_opt Effect 1
 # full screen while a song plays: both kinds, every background, quick open/close
 set_opt FsKind 0; act fullscreen true; sleep 5; alive "full screen (music display)"; shot 08-fs-music
 for b in 0 1 2 3 4 5 6; do set_opt FsBg $b; sleep 0.8; alive "music display background $b"; done
@@ -108,9 +111,10 @@ for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather; do set_opt $k true
 echo "memory after playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
 grep -E "audio:|desktop widgets" "$DIR/orbit.log" | tail -3
 grep -E "screen [0-9]+x" "$DIR/orbit.log" | tail -1
-# a second copy takes over and the first one leaves
+# a second copy takes over and the first one leaves — this one draws as many pixels as a Retina
+# screen (ORBIT_SCALE=2), to see what a MacBook pays
 OLD=$PID
-ORBIT_NO_SETTINGS=1 ORBIT_FAKE_PLAY=1 "$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout3.log 2>&1 &
+ORBIT_SCALE=2 ORBIT_PERF=1 ORBIT_NO_SETTINGS=1 ORBIT_FAKE_PLAY=1 "$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout3.log 2>&1 &
 PID=$!
 sleep 6
 kill -0 $OLD 2>/dev/null && fail "the older Orbit is still running next to the new one"
@@ -120,6 +124,15 @@ tail -5 "$DIR/orbit.log"
 PORT=$(grep -oE "settings window on 127.0.0.1:[0-9]+" "$DIR/orbit.log" | tail -1 | cut -d: -f2)
 BASE=http://127.0.0.1:${PORT:-47330}
 TOK=$(cat "$DIR/settings.key")
+set_opt FPS 60; measure "Retina pixels, 60 fps, all widgets"
+set_opt ShowGlow true; measure "Retina pixels, 60 fps, all widgets + screen glow"
+set_opt ShowGlow false
+for s in 0 3 6 10 14 20 26; do set_opt LyricsStyle $s; sleep 1.5; alive "lyrics style $s at Retina size"; done
+for e in 0 1 2 3 4 5 6 7 8 9 10 11; do set_opt Effect $e; sleep 1; alive "lyrics effect $e at Retina size"; done
+set_opt Effect 1; set_opt FsKind 0; act fullscreen true; sleep 8; alive "full screen at Retina size"
+grep "perf:" "$DIR/orbit.log" | tail -1
+act fullscreen false; sleep 1
+shot 11-retina
 act quit true; sleep 3
 grep -E "closed [0-9]+ other" "$DIR/orbit.log" | tail -1
 echo "Orbit (macOS) played without crashing"
