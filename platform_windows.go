@@ -81,3 +81,52 @@ func fullscreenOn(m RECT) bool {
 	call(pGetWindowRect, fg, uintptr(unsafe.Pointer(&r)))
 	return r.Left <= m.Left && r.Top <= m.Top && r.Right >= m.Right && r.Bottom >= m.Bottom
 }
+
+func mediaKey(vk uintptr) {
+	call(pKeybdEvent, vk, 0, 0, 0)
+	call(pKeybdEvent, vk, 0, 2, 0)
+}
+
+// openURL: a link in the default app/browser.
+func openURL(u string) bool {
+	return call(pShellExecuteW, 0, uintptr(unsafe.Pointer(u16("open"))), uintptr(unsafe.Pointer(u16(u))), 0, 0, 1) > 32
+}
+
+// popupMenu: a small menu at the mouse; returns the picked item (-1: none).
+func popupMenu(items []string, checked int, owner uintptr) int {
+	m := call(pCreatePopupMenu)
+	for i, n := range items {
+		menuItem(m, 1+i, n, checked == i)
+	}
+	var pt POINT
+	call(pGetCursorPos, uintptr(unsafe.Pointer(&pt)))
+	id := int(call(pTrackPopupMenu, m, TPM_RIGHTBUTTON|TPM_RETURNCMD|TPM_BOTTOMALIGN, uintptr(pt.X), uintptr(pt.Y), 0, owner, 0))
+	call(pDestroyMenu, m)
+	return id - 1
+}
+
+func fsCapture(hwnd uintptr, on bool) {
+	if on {
+		call(pSetCapture, hwnd)
+	} else {
+		call(pReleaseCapture)
+	}
+}
+
+// fsInFront: the full-screen window is the active one.
+func fsInFront(f *FullView) bool { return call(pGetForegroundWnd) == f.hwnd }
+
+func showCursor(on bool) {
+	if on {
+		call(pSetCursor, call(pLoadCursorW, 0, 32512))
+	} else {
+		call(pSetCursor, 0)
+	}
+}
+
+// fsRefocus: after the menu took the focus, full screen takes it back.
+func fsRefocus() {
+	if fs != nil {
+		call(pSetForegroundWindow, fs.hwnd)
+	}
+}

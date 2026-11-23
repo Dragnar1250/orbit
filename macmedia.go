@@ -12,6 +12,7 @@ import (
 type macNowPlaying struct {
 	App, State, Title, Artist, Album, Art string
 	Pos, Dur                              float64
+	Shuffle, Repeat                       int // -1 unknown; repeat 0 off, 1 this song, 2 all
 }
 
 // macNumber reads AppleScript numbers in any locale ("12,5" in Turkish, "1.234,5", "3.0E+2").
@@ -53,6 +54,23 @@ func parseMacNowPlaying(out string) (macNowPlaying, bool) {
 	}
 	if len(f) > 7 && strings.HasPrefix(strings.TrimSpace(f[7]), "https://") {
 		n.Art = strings.TrimSpace(f[7])
+	}
+	n.Shuffle, n.Repeat = -1, -1
+	if len(f) > 9 {
+		switch strings.TrimSpace(f[8]) {
+		case "true":
+			n.Shuffle = 1
+		case "false":
+			n.Shuffle = 0
+		}
+		switch strings.TrimSpace(f[9]) {
+		case "off", "false":
+			n.Repeat = 0
+		case "one":
+			n.Repeat = 1
+		case "all", "true":
+			n.Repeat = 2
+		}
 	}
 	if n.Title == "" || looksLikeID(n.Title) || strings.HasPrefix(n.Title, "spotify:") || (n.App == "spotify" && (n.Title == "Advertisement" || n.Title == "Spotify")) { // ads
 		return n, false
@@ -108,9 +126,14 @@ const macPlayersScript = `function run() {
       if (!a.running()) return;
       var st = c(a.playerState());
       if (st === "stopped") { out.push(p[1] + "\tstopped"); return; }
-      var t = a.currentTrack, art = "";
-      if (p[1] === "spotify") { try { art = c(t.artworkUrl()); } catch (e) {} }
-      out.push([p[1], st, c(t.name()), c(t.artist()), c(t.album()), c(a.playerPosition()), c(t.duration()), art].join("\t"));
+      var t = a.currentTrack, art = "", sh = "", rp = "";
+      if (p[1] === "spotify") {
+        try { art = c(t.artworkUrl()); } catch (e) {}
+        try { sh = c(a.shuffling()); rp = c(a.repeating()); } catch (e) {}
+      } else {
+        try { sh = c(a.shuffleEnabled()); rp = c(a.songRepeat()); } catch (e) {}
+      }
+      out.push([p[1], st, c(t.name()), c(t.artist()), c(t.album()), c(a.playerPosition()), c(t.duration()), art, sh, rp].join("\t"));
     } catch (e) {}
   });
   return out.join("\n");

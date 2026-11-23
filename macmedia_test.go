@@ -102,3 +102,18 @@ func TestLyricFrame(t *testing.T) {
 		t.Fatal("last line")
 	}
 }
+
+func TestParseMacModes(t *testing.T) {
+	n, ok := parseMacNowPlaying("spotify\tplaying\tSwim\tA\tB\t1\t200000\t\ttrue\tfalse")
+	if !ok || n.Shuffle != 1 || n.Repeat != 0 {
+		t.Fatalf("%+v", n)
+	}
+	n, _ = parseMacNowPlaying("music\tplaying\tSwim\tA\tB\t1\t200\t\tfalse\tone")
+	if n.Shuffle != 0 || n.Repeat != 1 {
+		t.Fatalf("%+v", n)
+	}
+	n, _ = parseMacNowPlaying("music\tplaying\tSwim\tA\tB\t1\t200\t")
+	if n.Shuffle != -1 || n.Repeat != -1 {
+		t.Fatalf("unknown %+v", n)
+	}
+}

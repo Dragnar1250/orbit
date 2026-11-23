@@ -493,3 +493,19 @@ void og_text_path(OPath *p, OFont *f, const char *s, int n, float x, float y) {
 	}
 	CFRelease(l);
 }
+
+// og_blend: put a whole canvas onto another at (x, y) with an opacity, ignoring the target's
+// transform and clip (like GDI's AlphaBlend onto the DC)
+void og_blend(OG *dst, OG *src, float x, float y, float alpha) {
+	CGImageRef img = CGBitmapContextCreateImage(src->ctx);
+	if (!img) return;
+	CGContextRestoreGState(dst->ctx); // back to the bare base state
+	CGContextSaveGState(dst->ctx);
+	CGContextSetAlpha(dst->ctx, alpha);
+	CGContextSetBlendMode(dst->ctx, kCGBlendModeNormal);
+	CGContextTranslateCTM(dst->ctx, x, y + src->h);
+	CGContextScaleCTM(dst->ctx, 1, -1);
+	CGContextDrawImage(dst->ctx, CGRectMake(0, 0, src->w, src->h), img);
+	CGImageRelease(img);
+	og_apply(dst); // the clip and transform as they were
+}

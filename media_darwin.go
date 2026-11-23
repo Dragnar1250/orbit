@@ -55,6 +55,7 @@ func macMediaLoop() {
 				media.SetDuration(key, n.Dur)
 			}
 			media.SetPosition(n.Pos, n.State == "playing")
+			media.SetModes(Modes{Shuffle: n.Shuffle, Repeat: n.Repeat, CanShuffle: true, CanRepeat: true})
 			if key != lastKey {
 				lastKey = key
 				go macCover(key, n)

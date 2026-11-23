@@ -73,6 +73,21 @@ set_opt Motion 1; sleep 6; alive "playing with everything on"
 shot 06-playing
 for s in 0 1 2 3 4 5; do set_opt HaloStyle $s; sleep 1; alive "visualizer style $s while playing"; done
 shot 07-visualizer
+# full screen while a song plays: both kinds, every background, quick open/close
+set_opt FsKind 0; act fullscreen true; sleep 5; alive "full screen (music display)"; shot 08-fs-music
+for b in 0 1 2 3 4 5 6; do set_opt FsBg $b; sleep 0.8; alive "music display background $b"; done
+act fullscreen false; sleep 1
+set_opt FsKind 1; act fullscreen true; sleep 5; alive "full screen (desktop skin)"; shot 09-fs-skin
+for m in 0 1 2; do set_opt SkinCentre $m; sleep 0.8; alive "skin middle $m"; done
+for b in 0 1 2 3 4 5 6 7 8; do set_opt SkinBg $b; sleep 0.8; alive "skin background $b"; done
+set_opt SkinBg 9; sleep 8; alive "music video background"; shot 10-fs-video
+fc0=$(cpu); sleep 10; fc1=$(cpu)
+echo "CPU in full screen: $(awk -v a=$fc0 -v b=$fc1 'BEGIN{printf "%.2f s in 10 s = %.2f%% of one core", b-a, (b-a)/10*100}')"
+echo "memory in full screen: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
+act fullscreen false; sleep 2; alive "leave full screen"
+for i in 1 2 3 4 5 6; do act fullscreen true; sleep 0.4; act fullscreen false; sleep 0.4; done
+sleep 2; alive "full screen opened and closed 6 times"
+grep -E "full screen|video" "$DIR/orbit.log" | tail -6
 echo "memory while playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
 c0=$(cpu); sleep 20; c1=$(cpu)
 echo "CPU while playing: $(awk -v a=$c0 -v b=$c1 'BEGIN{printf "%.2f s in 20 s = %.2f%% of one core", b-a, (b-a)/20*100}')"

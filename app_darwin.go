@@ -218,14 +218,6 @@ func formatDate(t time.Time, long bool) string {
 
 func trayBalloon(title, text string) { logf("%s: %s", title, text) }
 
-/* ---------- full screen (comes to the Mac next) ---------- */
-
-type FullView struct{}
-
-var fs *FullView
-
-func closeFullscreen() {}
-
 /* ---------- start ---------- */
 
 var macLastPt POINT
@@ -270,6 +262,7 @@ func goStarted() {
 	hooks.SetOpacity = setOpacity
 	hooks.FormatDate = formatDate
 	hooks.OpenSettings = openSettings
+	hooks.Fullscreen = func(open bool) { setFullscreen(open) }
 	if srv, err := startSettingsServer(""); err == nil {
 		settingsSrv = srv
 		logf("settings window on 127.0.0.1:%d", srv.port)
@@ -335,6 +328,17 @@ func goTick() {
 	macLastPt = pt
 	hoverCheck()
 	bands, bass, active := spectrum.Compute()
+	if fs != nil { // full screen covers the screen: only it is drawn
+		atomic.StoreInt32(&bandsWanted, 1)
+		fs.Update(now, snap, bands, bass)
+		needRedraw, layoutDirty, styleDirty = false, false, false
+		saveConfigIfDue(false)
+		C.os_set_rate(C.double(max(5, atomic.LoadInt32(&fpsNow))))
+		return
+	}
+	if snap.Playing {
+		prefetchHiRes(snap.Track)
+	}
 	ui := uiScale()
 	vinyl.Update(now, snap, bands, bass, ui)
 	halo.Update(now, snap, bands, bass, active, ui)
@@ -581,6 +585,7 @@ func buildMenu() {
 	sep()
 	add("Settings…", 1, false, true)
 	add("Arrange widgets", 2, editMode, true)
+	add(map[bool]string{true: "Leave full screen", false: "Full screen"}[fs != nil], 20, false, true)
 	sep()
 	add("Lyrics", 10, cfg.ShowLyrics, true)
 	add("Turntable", 11, cfg.ShowVinyl, true)
@@ -610,6 +615,8 @@ func goMenu(tag C.int) {
 		openSettings()
 	case 2:
 		setEditMode(!editMode)
+	case 20:
+		setFullscreen(fs == nil)
 	case 3:
 		mediaPlayPause()
 	case 4:

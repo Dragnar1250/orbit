@@ -360,3 +360,5 @@ int os_desktop_at_now(double x, double y) {
 }
 
 double os_double_click_time(void) { return NSEvent.doubleClickInterval; }
+
+void os_show_menu(void) { [menu popUpMenuPositioningItem:nil atLocation:NSEvent.mouseLocation inView:nil]; }

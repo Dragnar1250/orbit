@@ -25,3 +25,4 @@ int os_settings_open(void);
 double os_double_click_time(void);
 int os_take_over(void);
 int os_desktop_at_now(double x, double y);
+void os_show_menu(void);

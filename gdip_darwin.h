@@ -56,3 +56,4 @@ void og_font_free(OFont *f);
 void og_measure(OFont *f, const char *s, int n, float *w, float *h);
 void og_text(OG *g, OFont *f, const char *s, int n, float x, float y, float maxW, uint32_t c, int align);
 void og_text_path(OPath *p, OFont *f, const char *s, int n, float x, float y);
+void og_blend(OG *dst, OG *src, float x, float y, float alpha);

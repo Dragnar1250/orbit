@@ -1,3 +1,5 @@
+//go:build windows || darwin
+
 package main
 
 // Desktop skin — the second kind of full screen: a big clock, "Continue playing", a now playing
@@ -9,18 +11,12 @@ import (
 	"math"
 	"strings"
 	"time"
-	"unsafe"
 )
 
 const (
 	vkMediaNext = 0xB0
 	vkMediaPrev = 0xB1
 )
-
-func mediaKey(vk uintptr) {
-	call(pKeybdEvent, vk, 0, 0, 0)
-	call(pKeybdEvent, vk, 0, 2, 0)
-}
 
 type fsHit struct {
 	x, y, w, h float32
@@ -1107,7 +1103,7 @@ func (f *FullView) skinClick(x, y float32) bool {
 		if snap.Track != nil && snap.Track.Duration > 0 {
 			sk.dragging, sk.dragFrac = true, f.seekFrac(x)
 			sk.bar.sig = ""
-			call(pSetCapture, f.hwnd)
+			fsCapture(f.hwnd, true)
 		}
 	case "search":
 		sk.searchOn = true
@@ -1118,14 +1114,7 @@ func (f *FullView) skinClick(x, y float32) bool {
 }
 
 func (f *FullView) serviceMenu() {
-	m := call(pCreatePopupMenu)
-	for i, n := range serviceNames {
-		menuItem(m, 1+i, n, cfg.SkinService == i)
-	}
-	var pt POINT
-	call(pGetCursorPos, uintptr(unsafe.Pointer(&pt)))
-	id := int(call(pTrackPopupMenu, m, TPM_RIGHTBUTTON|TPM_RETURNCMD|TPM_BOTTOMALIGN, uintptr(pt.X), uintptr(pt.Y), 0, f.hwnd, 0))
-	call(pDestroyMenu, m)
+	id := popupMenu(serviceNames, cfg.SkinService, f.hwnd) + 1
 	if id > 0 && id <= len(serviceNames) {
 		f.set(func() { cfg.SkinService = id - 1 }, "Search with · "+serviceNames[id-1])
 	}
@@ -1138,13 +1127,11 @@ func (f *FullView) openSearch(q string) {
 		return
 	}
 	svc := serviceFor(cfg.SkinService, media.Snapshot().Source)
-	u := searchURL(svc, q)
-	r := call(pShellExecuteW, 0, uintptr(unsafe.Pointer(u16("open"))), uintptr(unsafe.Pointer(u16(u))), 0, 0, 1)
-	if r <= 32 && svc == svcSpotify { // no Spotify app here: the web player
-		u = searchURL(svcSpotifyWeb, q)
-		r = call(pShellExecuteW, 0, uintptr(unsafe.Pointer(u16("open"))), uintptr(unsafe.Pointer(u16(u))), 0, 0, 1)
+	ok := openURL(searchURL(svc, q))
+	if !ok && svc == svcSpotify { // no Spotify app here: the web player
+		ok = openURL(searchURL(svcSpotifyWeb, q))
 	}
-	if r <= 32 {
+	if !ok {
 		f.say("Couldn't open " + serviceNames[svc])
 		return
 	}
@@ -1465,7 +1452,7 @@ func (f *FullView) seekUp(x float32) {
 		return
 	}
 	sk.dragging = false
-	call(pReleaseCapture)
+	fsCapture(f.hwnd, false)
 	snap := media.Snapshot()
 	if snap.Track == nil || snap.Track.Duration <= 0 {
 		return
