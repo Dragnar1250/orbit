@@ -1,6 +1,7 @@
 // Orbit for macOS — the Cocoa side: the menu-bar item, one borderless window per widget (its
 // picture is a CALayer, composited by the GPU), screen and mouse information, dates.
 #import <Cocoa/Cocoa.h>
+#import <QuartzCore/QuartzCore.h>
 #include "_cgo_export.h"
 #include "gdip_darwin.h"
 #include "app_darwin.h"

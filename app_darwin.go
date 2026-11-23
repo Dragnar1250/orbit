@@ -7,7 +7,7 @@ package main
 
 /*
 #cgo CFLAGS: -fobjc-arc -Wno-deprecated-declarations
-#cgo LDFLAGS: -framework Cocoa
+#cgo LDFLAGS: -framework Cocoa -framework QuartzCore
 #include <stdlib.h>
 #include "gdip_darwin.h"
 #include "app_darwin.h"
