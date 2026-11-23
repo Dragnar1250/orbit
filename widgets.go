@@ -738,7 +738,9 @@ func (gv *GlowView) Update(now time.Time, snap MediaSnap, bands [nBands]float32,
 	if fps == 0 {
 		fps = 5
 	}
-	if now.Sub(gv.frameAt) < time.Second/time.Duration(fps) && !styleDirty {
+	// (a few ms early is on time: frames come every 1/60 s, give or take, and a strict check
+	// would skip every other one and drop to 15 fps)
+	if now.Sub(gv.frameAt) < time.Second/time.Duration(fps)-4*time.Millisecond && !styleDirty {
 		return
 	}
 	dt := math.Min(0.2, now.Sub(gv.frameAt).Seconds())

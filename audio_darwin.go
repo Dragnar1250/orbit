@@ -9,6 +9,7 @@ package main
 import "C"
 
 import (
+	"math"
 	"sync/atomic"
 	"time"
 )
@@ -21,6 +22,7 @@ var bandsWanted int32
 func audioLoop() {
 	buf := make([]float32, 8192)
 	on, failedAt := false, time.Time{}
+	lat, latAt := -1.0, time.Time{}
 	for {
 		want := atomic.LoadInt32(&bandsWanted) == 1
 		switch {
@@ -41,11 +43,20 @@ func audioLoop() {
 			on = false
 		}
 		if on {
+			if time.Since(latAt) > 3*time.Second { // headphones come and go
+				latAt = time.Now()
+				d := float64(C.os_audio_out_latency())
+				if math.Abs(d-lat) > 0.005 {
+					lat = d
+					logf("audio: the output plays %.0f ms after the tap hears it — visuals wait for it", d*1000)
+				}
+				C.os_audio_set_delay(C.double(lat))
+			}
 			n := int(C.os_audio_read((*C.float)(&buf[0]), C.int(len(buf))))
 			if n > 0 {
 				spectrum.Feed(buf[:n], float64(C.os_audio_rate()))
 			}
-			time.Sleep(30 * time.Millisecond)
+			time.Sleep(8 * time.Millisecond) // fresh samples for every frame at 60 fps and more
 		} else {
 			time.Sleep(500 * time.Millisecond)
 		}

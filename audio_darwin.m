@@ -10,6 +10,7 @@
 #define HAVE_TAPS 1
 #endif
 #include <stdatomic.h>
+#include <math.h>
 #include "audio_darwin.h"
 
 #define RING 65536
@@ -22,14 +23,54 @@ static int running;
 
 double os_audio_rate(void) { return rate; }
 
+static _Atomic unsigned long delaySamples;
+
+// os_audio_read: the samples that are being heard now. The tap gets the sound before the
+// speakers do — Bluetooth headphones play it up to a quarter of a second later — so the newest
+// samples are held back by the output's own latency, or the visuals would run ahead of the music.
 int os_audio_read(float *out, int max) {
-	unsigned long w = atomic_load(&wpos), r = atomic_load(&rpos);
+	unsigned long w = atomic_load(&wpos), r = atomic_load(&rpos), d = atomic_load(&delaySamples);
+	w = w > d ? w - d : 0;
+	if (r > w) return 0;
 	if (w - r > RING) r = w - RING; // fell behind: keep the newest
 	int n = 0;
 	while (r < w && n < max) out[n++] = ring[r++ % RING];
 	atomic_store(&rpos, r);
 	return n;
 }
+
+static UInt32 prop(AudioObjectID o, AudioObjectPropertySelector sel, AudioObjectPropertyScope sc) {
+	AudioObjectPropertyAddress a = {sel, sc, kAudioObjectPropertyElementMain};
+	UInt32 v = 0, sz = sizeof(v);
+	if (AudioObjectGetPropertyData(o, &a, 0, NULL, &sz, &v) != noErr) return 0;
+	return v;
+}
+
+// os_audio_out_latency: seconds between a sample leaving the apps and reaching the ears on the
+// current output (device + safety offset + stream + buffer; Bluetooth reports its own delay)
+double os_audio_out_latency(void) {
+	AudioObjectPropertyAddress a = {kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
+	AudioObjectID dev = 0;
+	UInt32 sz = sizeof(dev);
+	if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, NULL, &sz, &dev) != noErr || !dev) return 0;
+	Float64 sr = 0;
+	sz = sizeof(sr);
+	AudioObjectPropertyAddress ar = {kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
+	if (AudioObjectGetPropertyData(dev, &ar, 0, NULL, &sz, &sr) != noErr || sr <= 0) return 0;
+	UInt32 frames = prop(dev, kAudioDevicePropertyLatency, kAudioObjectPropertyScopeOutput) +
+		prop(dev, kAudioDevicePropertySafetyOffset, kAudioObjectPropertyScopeOutput) +
+		prop(dev, kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeOutput);
+	AudioObjectPropertyAddress as = {kAudioDevicePropertyStreams, kAudioObjectPropertyScopeOutput, kAudioObjectPropertyElementMain};
+	if (AudioObjectGetPropertyDataSize(dev, &as, 0, NULL, &sz) == noErr && sz >= sizeof(AudioStreamID)) {
+		AudioStreamID st[8];
+		if (sz > sizeof(st)) sz = sizeof(st);
+		if (AudioObjectGetPropertyData(dev, &as, 0, NULL, &sz, st) == noErr) frames += prop(st[0], kAudioStreamPropertyLatency, kAudioObjectPropertyScopeGlobal);
+	}
+	double s = frames / sr;
+	return s > 1 ? 1 : s;
+}
+
+void os_audio_set_delay(double secs) { atomic_store(&delaySamples, (unsigned long)(fmax(0, secs) * rate)); }
 
 // os_audio_start: 0 ok, 1 not available on this macOS, else the error (e.g. permission refused)
 int os_audio_start(void) {

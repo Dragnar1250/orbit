@@ -2732,6 +2732,9 @@ func (lv *LyricsView) place(newLine bool, ui float64) {
 			avoid = append(avoid, rectI{int(r.Left) - 20, int(r.Top) - 20, int(r.Right) + 20, int(r.Bottom) + 20})
 		}
 	}
+	for _, r := range otherDesktopWidgets() { // the Mac's own desktop widgets (calendar, photos …)
+		avoid = append(avoid, rectI{int(r.Left) - 12, int(r.Top) - 12, int(r.Right) + 12, int(r.Bottom) + 12})
+	}
 	x, y := randomSpot(lv.rng, area, W, H+int(lv.fontSize(ui)*1.2), avoid, lv.last)
 	lv.last = [2]int{x, y}
 	lv.w.moveTo(x, y)

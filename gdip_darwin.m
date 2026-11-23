@@ -92,6 +92,8 @@ void og_free(OG *g) {
 }
 
 void *og_bits(OG *g) { return g ? g->bits : NULL; }
+int og_width(OG *g) { return g ? g->w : 0; }
+int og_height(OG *g) { return g ? g->h : 0; }
 
 /* ---------- state ---------- */
 
@@ -310,6 +312,25 @@ void og_radial(OG *g, float cx, float cy, float rx, float ry, uint32_t center, u
 
 /* ---------- images ---------- */
 
+// flatten: decode a picture once into the canvases' own pixel format (device RGB, premultiplied
+// BGRA). A JPEG left as it is gets decoded and colour-converted again every time it is drawn —
+// album art is drawn every frame. Very large pictures are kept at 2048 px (more is never shown).
+static CGImageRef flatten(CGImageRef img) { // takes img, returns +1
+	size_t w = CGImageGetWidth(img), h = CGImageGetHeight(img);
+	if (w == 0 || h == 0) return img;
+	double k = fmin(1.0, 2048.0 / (double)(w > h ? w : h));
+	size_t W = (size_t)fmax(1, round(w * k)), H = (size_t)fmax(1, round(h * k));
+	CGContextRef c = CGBitmapContextCreate(NULL, W, H, 8, W * 4, rgb(), kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+	if (!c) return img;
+	CGContextSetInterpolationQuality(c, kCGInterpolationHigh);
+	CGContextDrawImage(c, CGRectMake(0, 0, W, H), img);
+	CGImageRef out = CGBitmapContextCreateImage(c);
+	CGContextRelease(c);
+	if (!out) return img;
+	CGImageRelease(img);
+	return out;
+}
+
 OImg *og_img_from_bytes(const void *b, int n) {
 	CFDataRef d = CFDataCreate(NULL, b, n);
 	CGImageSourceRef src = CGImageSourceCreateWithData(d, NULL);
@@ -319,7 +340,7 @@ OImg *og_img_from_bytes(const void *b, int n) {
 	CFRelease(src);
 	if (!img) return NULL;
 	OImg *o = calloc(1, sizeof(OImg));
-	o->img = img;
+	o->img = flatten(img);
 	return o;
 }
 
@@ -332,7 +353,7 @@ OImg *og_img_from_file(const char *path) {
 	CFRelease(src);
 	if (!img) return NULL;
 	OImg *o = calloc(1, sizeof(OImg));
-	o->img = img;
+	o->img = flatten(img);
 	return o;
 }
 

@@ -114,10 +114,21 @@ type rectI struct{ L, T, R, B int }
 
 func (a rectI) overlaps(b rectI) bool { return a.L < b.R && b.L < a.R && a.T < b.B && b.T < a.B }
 
+func (a rectI) overlapArea(b rectI) int {
+	w, h := min(a.R, b.R)-max(a.L, b.L), min(a.B, b.B)-max(a.T, b.T)
+	if w <= 0 || h <= 0 {
+		return 0
+	}
+	return w * h
+}
+
 // randomSpot picks a top-left for a w×h box inside area, avoiding the given rects and the last spot.
+// When no spot is free (big lyrics, a crowded screen) it takes the one that covers the least —
+// not just the fewest widgets — so the words land beside a widget, not on its text.
 func randomSpot(r *rand.Rand, area rectI, w, h int, avoid []rectI, last [2]int) (int, int) {
-	bestX, bestY, bestScore := area.L, area.T, -1.0
-	for i := 0; i < 40; i++ {
+	bestX, bestY, bestScore := area.L, area.T, math.Inf(-1)
+	boxArea := float64(max(1, w*h))
+	for i := 0; i < 90; i++ {
 		maxX, maxY := area.R-w, area.B-h
 		if maxX < area.L {
 			maxX = area.L
@@ -128,19 +139,18 @@ func randomSpot(r *rand.Rand, area rectI, w, h int, avoid []rectI, last [2]int) 
 		x := area.L + r.Intn(maxX-area.L+1)
 		y := area.T + r.Intn(maxY-area.T+1)
 		box := rectI{x, y, x + w, y + h}
-		score := 1.0
+		covered := 0
 		for _, a := range avoid {
-			if box.overlaps(a) {
-				score -= 1
-			}
+			covered += box.overlapArea(a)
 		}
+		score := 1 - 3*math.Min(1, float64(covered)/boxArea)
 		// prefer spots away from the previous line so it feels random, not jittery
 		dist := math.Hypot(float64(x-last[0]), float64(y-last[1]))
 		score += math.Min(1, dist/float64(area.R-area.L+1)*3) * 0.5
 		if score > bestScore {
 			bestX, bestY, bestScore = x, y, score
 		}
-		if score >= 1.45 {
+		if covered == 0 && score >= 1.45 {
 			break
 		}
 	}

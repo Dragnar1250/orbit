@@ -7,7 +7,7 @@ package main
 
 /*
 #cgo CFLAGS: -fobjc-arc -Wno-deprecated-declarations
-#cgo LDFLAGS: -framework Cocoa -framework QuartzCore -framework WebKit -framework CoreAudio -framework AudioToolbox
+#cgo LDFLAGS: -framework Cocoa -framework QuartzCore -framework WebKit -framework CoreAudio -framework AudioToolbox -framework IOSurface -framework CoreVideo
 #include <stdlib.h>
 #include "gdip_darwin.h"
 #include "app_darwin.h"
@@ -330,7 +330,11 @@ func goTick() {
 	bands, bass, active := spectrum.Compute()
 	if fs != nil { // full screen covers the screen: only it is drawn
 		atomic.StoreInt32(&bandsWanted, 1)
+		perf.tick(now)
+		t := time.Now()
 		fs.Update(now, snap, bands, bass)
+		perf.add(6, t)
+		perf.report(now, true)
 		needRedraw, layoutDirty, styleDirty = false, false, false
 		saveConfigIfDue(false)
 		C.os_set_rate(C.double(max(5, atomic.LoadInt32(&fpsNow))))
@@ -340,12 +344,21 @@ func goTick() {
 		prefetchHiRes(snap.Track)
 	}
 	ui := uiScale()
+	perf.tick(now)
+	t := time.Now()
 	vinyl.Update(now, snap, bands, bass, ui)
+	t = perf.add(0, t)
 	halo.Update(now, snap, bands, bass, active, ui)
+	t = perf.add(1, t)
 	lyricView.Update(now, snap, bass, ui)
+	t = perf.add(2, t)
 	clockView.Update(now, snap, bass, ui)
+	t = perf.add(3, t)
 	weatherView.Update(now, ui)
+	t = perf.add(4, t)
 	glowView.Update(now, snap, bands, bass, ui)
+	perf.add(5, t)
+	perf.report(now, snap.Playing)
 	updateBanner()
 	if layoutDirty {
 		logWidgets()
@@ -371,10 +384,6 @@ func goTick() {
 	fps := desktopFPS(snap, now)
 	if fps <= 0 {
 		fps = 5
-	}
-	fps = min(fps, 30) // the Mac composites every widget itself: 30 is smooth and half the work
-	if hoverName != "" || drag != nil {
-		fps = max(fps, 30)
 	}
 	C.os_set_rate(C.double(fps))
 	if now.Sub(lastTrim) > 2*time.Minute {
@@ -747,4 +756,89 @@ func fakePlay() {
 		spectrum.Feed(buf, 48000)
 		time.Sleep(30 * time.Millisecond)
 	}
+}
+
+// perf: where a frame's time goes, in orbit.log — every minute while music plays (every 5 s with
+// ORBIT_PERF=1). Frames per second as they really came, the slowest gap, and each widget's share.
+type perfStats struct {
+	frames  int
+	maxGap  time.Duration
+	last    time.Time
+	from    time.Time
+	spent   [7]time.Duration
+	every   time.Duration
+	started bool
+}
+
+var perf perfStats
+var perfNames = [7]string{"turntable", "visualizer", "lyrics", "clock", "weather", "glow", "full screen"}
+
+func (p *perfStats) tick(now time.Time) {
+	if !p.started {
+		p.started, p.from, p.every = true, now, time.Minute
+		if os.Getenv("ORBIT_PERF") != "" {
+			p.every = 5 * time.Second
+		}
+	}
+	if !p.last.IsZero() {
+		if gap := now.Sub(p.last); gap > p.maxGap && gap < time.Second {
+			p.maxGap = gap
+		}
+	}
+	p.last = now
+	p.frames++
+}
+
+func (p *perfStats) add(i int, from time.Time) time.Time {
+	n := time.Now()
+	p.spent[i] += n.Sub(from)
+	return n
+}
+
+func (p *perfStats) report(now time.Time, playing bool) {
+	el := now.Sub(p.from)
+	if el < p.every {
+		return
+	}
+	if playing && p.frames > 0 {
+		var secs C.double
+		n := int(C.os_present_stats(&secs))
+		out := fmt.Sprintf("perf: %.1f fps (screen %.0f Hz), slowest gap %.0f ms, shown %d pictures (%.2f ms each);", float64(p.frames)/el.Seconds(), float64(C.os_refresh_rate()), float64(p.maxGap.Microseconds())/1000, n, float64(secs)*1000/float64(max(n, 1)))
+		for i, d := range p.spent {
+			if d > 0 {
+				out += fmt.Sprintf(" %s %.2f ms", perfNames[i], float64(d.Microseconds())/1000/float64(p.frames))
+			}
+		}
+		logf("%s a frame", out)
+	} else {
+		var secs C.double
+		C.os_present_stats(&secs)
+	}
+	p.frames, p.maxGap, p.from, p.spent = 0, 0, now, [7]time.Duration{}
+}
+
+// otherDesktopWidgets: the Mac's own desktop widgets (Calendar, Photos, Weather …, macOS 14+) —
+// the lyrics keep clear of them like they do of Orbit's. Asked at most every 5 s.
+var (
+	deskWidgets   []RECT
+	deskWidgetsAt time.Time
+	deskWidgetLog string
+)
+
+func otherDesktopWidgets() []RECT {
+	if time.Since(deskWidgetsAt) < 5*time.Second {
+		return deskWidgets
+	}
+	deskWidgetsAt = time.Now()
+	var r [256]C.double
+	n := int(C.os_desktop_widgets(&r[0], 64))
+	deskWidgets = deskWidgets[:0]
+	for i := 0; i < n; i++ {
+		deskWidgets = append(deskWidgets, RECT{int32(r[4*i]), int32(r[4*i+1]), int32(r[4*i] + r[4*i+2]), int32(r[4*i+1] + r[4*i+3])})
+	}
+	if s := fmt.Sprint(deskWidgets); s != deskWidgetLog {
+		deskWidgetLog = s
+		logf("macOS desktop widgets the lyrics avoid: %d %v", len(deskWidgets), deskWidgets)
+	}
+	return deskWidgets
 }

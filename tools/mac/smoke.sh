@@ -64,7 +64,7 @@ echo "Orbit (macOS) went through everything without crashing"
 
 # ---- second run: a song "plays" (ORBIT_FAKE_PLAY) — visualizer, spinning record, lyrics, motion;
 # the cost while music plays; and only one Orbit at a time
-ORBIT_NO_SETTINGS=1 ORBIT_FAKE_PLAY=1 "$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout2.log 2>&1 &
+ORBIT_PERF=1 ORBIT_NO_SETTINGS=1 ORBIT_FAKE_PLAY=1 "$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout2.log 2>&1 &
 PID=$!
 sleep 8; alive "playing"
 TOK=$(cat "$DIR/settings.key")
@@ -82,6 +82,7 @@ for m in 0 1 2; do set_opt SkinCentre $m; sleep 0.8; alive "skin middle $m"; don
 for b in 0 1 2 3 4 5 6 7 8; do set_opt SkinBg $b; sleep 0.8; alive "skin background $b"; done
 set_opt SkinBg 9; sleep 8; alive "music video background"; shot 10-fs-video
 fc0=$(cpu); sleep 10; fc1=$(cpu)
+grep "perf:" "$DIR/orbit.log" | tail -1
 echo "CPU in full screen: $(awk -v a=$fc0 -v b=$fc1 'BEGIN{printf "%.2f s in 10 s = %.2f%% of one core", b-a, (b-a)/10*100}')"
 echo "memory in full screen: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
 act fullscreen false; sleep 2; alive "leave full screen"
@@ -90,10 +91,22 @@ sleep 2; alive "full screen opened and closed 6 times"
 grep -E "full screen|video" "$DIR/orbit.log" | tail -6
 echo "memory while playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
 # where the time goes while playing (macOS's sampler: native + Go stacks)
-sample $PID 5 -mayDie -file /tmp/orbit-sample.txt >/dev/null 2>&1 && awk '/Sort by top of stack/,0' /tmp/orbit-sample.txt | head -45 | sed 's/^/PROFILE /' 
-c0=$(cpu); sleep 20; c1=$(cpu)
-echo "CPU while playing: $(awk -v a=$c0 -v b=$c1 'BEGIN{printf "%.2f s in 20 s = %.2f%% of one core", b-a, (b-a)/20*100}')"
-echo "memory after 20 s playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
+# the cost while music plays, at each frame rate, with and without the screen glow
+measure() {
+  sleep 6; c0=$(cpu); sleep 15; c1=$(cpu)
+  echo "CPU while playing ($1): $(awk -v a=$c0 -v b=$c1 'BEGIN{printf "%.2f s in 15 s = %.2f%% of one core", b-a, (b-a)/15*100}') · memory $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
+  grep "perf:" "$DIR/orbit.log" | tail -1
+}
+set_opt FPS 60; measure "60 fps, all widgets"
+set_opt ShowGlow true; measure "60 fps, all widgets + screen glow"
+set_opt FPS 30; measure "30 fps, all widgets + screen glow"
+set_opt ShowGlow false; set_opt FPS 60
+for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather; do set_opt $k false; done
+for k in ShowVinyl ShowHalo ShowLyrics; do set_opt $k true; measure "60 fps, only $k"; set_opt $k false; done
+for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather; do set_opt $k true; done
+(timeout 30 sample $PID 5 -mayDie -file /tmp/orbit-sample.txt >/dev/null 2>&1 && awk '/Sort by top of stack/,0' /tmp/orbit-sample.txt | head -40 | sed 's/^/PROFILE /') || echo "no profile"
+echo "memory after playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
+grep -E "audio:|desktop widgets" "$DIR/orbit.log" | tail -3
 grep -E "screen [0-9]+x" "$DIR/orbit.log" | tail -1
 # a second copy takes over and the first one leaves
 OLD=$PID

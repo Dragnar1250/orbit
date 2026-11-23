@@ -119,22 +119,18 @@ void *fs_open(double x, double y, double w, double h) {
 	return (__bridge void *)fsWin;
 }
 
+static void *fsSurfaces;
+
 void fs_show(OG *g) {
 	if (!fsWin) return;
-	CGImageRef img = (CGImageRef)og_cgimage(g);
-	if (!img) return;
-	[CATransaction begin];
-	[CATransaction setDisableActions:YES];
 	NSView *v = fsWin.contentView;
-	v.layer.contents = (__bridge id)img;
-	v.layer.contentsScale = fsWin.backingScaleFactor;
-	[CATransaction commit];
-	CGImageRelease(img);
+	os_present_layer((__bridge void *)v.layer, &fsSurfaces, g, fsWin.backingScaleFactor);
 }
 
 void fs_close(void) {
 	fs_cursor(1);
-	if (fsWin) { [fsWin orderOut:nil]; [fsWin close]; fsWin = nil; }
+	if (fsWin) { [fsWin orderOut:nil]; fsWin.contentView.layer.contents = nil; [fsWin close]; fsWin = nil; }
+	os_present_free(&fsSurfaces);
 }
 
 int fs_in_front(void) { return fsWin && fsWin.isKeyWindow && NSApp.isActive; }

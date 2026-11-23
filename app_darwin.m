@@ -3,7 +3,10 @@
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
 #import <WebKit/WebKit.h>
+#import <IOSurface/IOSurface.h>
+#import <CoreVideo/CoreVideo.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include "_cgo_export.h"
 #include "gdip_darwin.h"
 #include "app_darwin.h"
@@ -48,9 +51,85 @@ void os_cursor(double *x, double *y) {
 
 int os_mouse_down(void) { return (NSEvent.pressedMouseButtons & 1) != 0; }
 
+
+/* ---------- showing a canvas: IOSurfaces the window server reads directly ---------- */
+
+// A CGImage per frame meant a copy-on-write copy of the canvas, a colour conversion and an upload
+// on every frame. An IOSurface is memory the GPU and the window server share: the canvas is copied
+// into it once (a plain memcpy) and the layer shows it as it is. Three of them in turn, so the one
+// being written is never the one on screen.
+@interface OrbitSurfaces : NSObject {
+@public
+	IOSurfaceRef s[3];
+	int w, h, cur;
+}
+@end
+@implementation OrbitSurfaces
+- (void)drop { for (int i = 0; i < 3; i++) if (s[i]) { CFRelease(s[i]); s[i] = NULL; } w = h = 0; }
+- (void)dealloc { [self drop]; }
+@end
+
+static IOSurfaceRef newSurface(int w, int h) {
+	NSDictionary *p = @{
+		(id)kIOSurfaceWidth: @(w), (id)kIOSurfaceHeight: @(h), (id)kIOSurfaceBytesPerElement: @4,
+		(id)kIOSurfacePixelFormat: @((unsigned)'BGRA'),
+	};
+	return IOSurfaceCreate((__bridge CFDictionaryRef)p);
+}
+
+static int presentCount;
+static double presentSecs;
+
+int os_present_stats(double *secs) { int n = presentCount; *secs = presentSecs; presentCount = 0; presentSecs = 0; return n; }
+
+// presentOn: put canvas g on layer l (all of it, or only the rows y0..y1 changed since the last frame)
+static void presentOn(CALayer *l, OrbitSurfaces *ps, OG *g, double scale) {
+	double t0 = CACurrentMediaTime();
+	int w = og_width(g), h = og_height(g);
+	if (ps->w != w || ps->h != h) {
+		[ps drop];
+		ps->w = w; ps->h = h;
+	}
+	int i = (ps->cur + 1) % 3;
+	for (int k = 0; k < 3; k++, i = (i + 1) % 3) { // one the window server isn't reading
+		if (!ps->s[i]) ps->s[i] = newSurface(w, h);
+		if (ps->s[i] && !IOSurfaceIsInUse(ps->s[i])) break;
+	}
+	IOSurfaceRef sf = ps->s[i];
+	if (!sf) return;
+	IOSurfaceLock(sf, 0, NULL);
+	uint8_t *dst = IOSurfaceGetBaseAddress(sf);
+	size_t dstride = IOSurfaceGetBytesPerRow(sf), srow = (size_t)w * 4;
+	const uint8_t *src = og_bits(g);
+	if (dstride == srow) memcpy(dst, src, srow * h);
+	else for (int y = 0; y < h; y++) memcpy(dst + y * dstride, src + y * srow, srow);
+	IOSurfaceUnlock(sf, 0, NULL);
+	ps->cur = i;
+	[CATransaction begin];
+	[CATransaction setDisableActions:YES]; // no implicit animation between frames
+	l.contents = (__bridge id)sf;
+	if (l.contentsScale != scale) l.contentsScale = scale;
+	[CATransaction commit];
+	presentCount++;
+	presentSecs += CACurrentMediaTime() - t0;
+}
+
+void os_present_layer(void *layer, void **state, OG *g, double scale) {
+	CALayer *l = (__bridge CALayer *)layer;
+	if (!*state) *state = (__bridge_retained void *)[OrbitSurfaces new];
+	presentOn(l, (__bridge OrbitSurfaces *)*state, g, scale);
+}
+
+void os_present_free(void **state) {
+	if (*state) { OrbitSurfaces *ps = (__bridge_transfer OrbitSurfaces *)*state; [ps drop]; *state = NULL; }
+}
+
 /* ---------- widget windows ---------- */
 
-@interface OrbitWidgetView : NSView
+@interface OrbitWidgetView : NSView {
+@public
+	void *surfaces;
+}
 @property int wid;
 @end
 
@@ -105,17 +184,10 @@ void ow_level(void *wp, int level) {
 // ow_show: put the canvas on screen at (x, y, w, h) pixels, with an opacity
 void ow_show(void *wp, OG *g, double x, double y, double w, double h, double alpha) {
 	NSWindow *win = (__bridge NSWindow *)wp;
-	CGImageRef img = (CGImageRef)og_cgimage(g);
-	if (!img) return;
 	double s = os_scale();
 	NSRect fr = NSMakeRect(x / s, mainTop() - (y + h) / s, w / s, h / s);
-	[CATransaction begin];
-	[CATransaction setDisableActions:YES]; // no implicit animation between frames
-	NSView *v = win.contentView;
-	v.layer.contents = (__bridge id)img;
-	v.layer.contentsScale = s;
-	[CATransaction commit];
-	CGImageRelease(img);
+	OrbitWidgetView *v = (OrbitWidgetView *)win.contentView;
+	os_present_layer((__bridge void *)v.layer, &v->surfaces, g, s);
 	if (!NSEqualRects(win.frame, fr)) [win setFrame:fr display:NO];
 	if (win.alphaValue != alpha) win.alphaValue = alpha;
 	if (!win.isVisible) [win orderFrontRegardless];
@@ -128,7 +200,13 @@ void ow_move(void *wp, double x, double y) {
 }
 
 void ow_rect(void *wp, double *out) { toPx(((__bridge NSWindow *)wp).frame, out); }
-void ow_hide(void *wp) { [(__bridge NSWindow *)wp orderOut:nil]; }
+void ow_hide(void *wp) {
+	NSWindow *w = (__bridge NSWindow *)wp;
+	[w orderOut:nil];
+	OrbitWidgetView *v = (OrbitWidgetView *)w.contentView;
+	v.layer.contents = nil;
+	os_present_free(&v->surfaces); // hidden widgets keep no picture
+}
 void ow_mouse(void *wp, int on) { ((__bridge NSWindow *)wp).ignoresMouseEvents = !on; }
 void ow_close(void *wp) { NSWindow *w = (__bridge_transfer NSWindow *)wp; [w orderOut:nil]; [w close]; }
 
@@ -250,16 +328,73 @@ void os_menu_add(const char *title, int tag, int checked, int enabled) {
 	[menu addItem:it];
 }
 
-// how often Go is asked for a frame: the chosen fps while something moves, a few when idle
+// how often Go is asked for a frame: the chosen fps while something moves, a few when idle.
+// Frames come from the display's own refresh (CVDisplayLink), every n-th one for the chosen fps,
+// so they are evenly spaced and land just before the screen is redrawn — a timer drifts against
+// the refresh and every so often two frames land in one refresh and none in the next, which
+// looks like stutter. A slow timer is used when little moves (fewer wake-ups).
+static CVDisplayLinkRef link;
+static _Atomic int linkWant, linkPending, linkDiv, linkCount;
+static double linkRefresh = 60;
+
+static CVReturn linkFired(CVDisplayLinkRef l, const CVTimeStamp *now, const CVTimeStamp *out, CVOptionFlags in, CVOptionFlags *flags, void *ctx) {
+	if (!atomic_load(&linkWant)) return kCVReturnSuccess;
+	int n = atomic_fetch_add(&linkCount, 1) + 1;
+	if (n < atomic_load(&linkDiv)) return kCVReturnSuccess;
+	if (atomic_exchange(&linkPending, 1)) return kCVReturnSuccess; // the last frame is still being drawn: skip, don't queue up
+	atomic_store(&linkCount, 0);
+	dispatch_async(dispatch_get_main_queue(), ^{
+		atomic_store(&linkPending, 0);
+		goTick();
+	});
+	return kCVReturnSuccess;
+}
+
+static void linkStart(double hz) {
+	if (!link) {
+		if (CVDisplayLinkCreateWithActiveCGDisplays(&link) != kCVReturnSuccess) { link = NULL; return; }
+		CVDisplayLinkSetOutputCallback(link, linkFired, NULL);
+	}
+	CVDisplayLinkSetCurrentCGDisplay(link, CGMainDisplayID());
+	double per = CVDisplayLinkGetActualOutputVideoRefreshPeriod(link);
+	if (per <= 0) {
+		CVTime t = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link);
+		if (t.timeValue > 0) per = (double)t.timeValue / t.timeScale;
+	}
+	if (per > 0) linkRefresh = 1 / per;
+	int div = (int)lround(linkRefresh / hz);
+	atomic_store(&linkDiv, div < 1 ? 1 : div);
+	atomic_store(&linkWant, 1);
+	if (!CVDisplayLinkIsRunning(link)) CVDisplayLinkStart(link);
+}
+
+static void linkStop(void) {
+	atomic_store(&linkWant, 0);
+	if (link && CVDisplayLinkIsRunning(link)) CVDisplayLinkStop(link);
+}
+
+double os_refresh_rate(void) { return linkRefresh; }
+
 void os_set_rate(double hz) {
 	if (hz < 1) hz = 1;
 	if (fabs(hz - tickHz) < 0.01) return;
 	tickHz = hz;
+	if (hz >= 20) {
+		linkStart(hz);
+		if (link) {
+			[tickTimer invalidate];
+			tickTimer = nil;
+			return;
+		}
+	}
+	linkStop();
 	[tickTimer invalidate];
 	tickTimer = [NSTimer timerWithTimeInterval:1.0 / hz target:delegate selector:@selector(tick:) userInfo:nil repeats:YES];
 	tickTimer.tolerance = 0.1 / hz; // lets macOS group wake-ups
 	[[NSRunLoop mainRunLoop] addTimer:tickTimer forMode:NSRunLoopCommonModes];
 }
+
+void os_screens_changed(void) { if (tickHz >= 20 && link) { double h = tickHz; tickHz = 0; os_set_rate(h); } }
 
 // os_take_over: only one Orbit at a time — an Orbit already running (an older copy, another
 // place on disk, a login item) is asked to quit, and stopped if it doesn't within 3 s.
@@ -318,7 +453,7 @@ void os_run(const char *iconPath) {
 		for (NSString *name in @[@"com.spotify.client.PlaybackStateChanged", @"com.apple.Music.playerInfo"]) {
 			[[NSDistributedNotificationCenter defaultCenter] addObserverForName:name object:nil queue:nil usingBlock:^(NSNotification *n) { goMediaPing(); }];
 		}
-		[[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidChangeScreenParametersNotification object:nil queue:nil usingBlock:^(NSNotification *n) { goScreensChanged(); }];
+		[[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidChangeScreenParametersNotification object:nil queue:nil usingBlock:^(NSNotification *n) { os_screens_changed(); goScreensChanged(); }];
 		os_set_rate(2);
 		[NSApp run];
 	}
@@ -363,3 +498,29 @@ int os_desktop_at_now(double x, double y) {
 double os_double_click_time(void) { return NSEvent.doubleClickInterval; }
 
 void os_show_menu(void) { [menu popUpMenuPositioningItem:nil atLocation:NSEvent.mouseLocation inView:nil]; }
+
+// os_desktop_widgets: where the Mac's desktop widgets are (pixels). They are windows of the
+// Notification Center (WidgetKit) under the normal windows; full-screen ones are not widgets.
+int os_desktop_widgets(double *out, int max) {
+	CFArrayRef list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
+	if (!list) return 0;
+	double s = os_scale();
+	NSRect scr = mainScreen().frame;
+	int n = 0;
+	for (CFIndex i = 0; i < CFArrayGetCount(list) && n < max; i++) {
+		NSDictionary *w = (__bridge NSDictionary *)CFArrayGetValueAtIndex(list, i);
+		NSString *owner = w[(id)kCGWindowOwnerName];
+		if (![owner isEqualToString:@"Notification Center"] && ![owner isEqualToString:@"NotificationCenter"] && ![owner hasPrefix:@"WidgetKit"]) continue;
+		if ([w[(id)kCGWindowLayer] intValue] >= 0) continue; // banners and the side panel are above the windows
+		CGRect r;
+		if (!CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)w[(id)kCGWindowBounds], &r)) continue;
+		if (r.size.width < 40 || r.size.height < 40 || r.size.width * r.size.height > 0.4 * scr.size.width * scr.size.height) continue;
+		out[4 * n] = r.origin.x * s;
+		out[4 * n + 1] = r.origin.y * s;
+		out[4 * n + 2] = r.size.width * s;
+		out[4 * n + 3] = r.size.height * s;
+		n++;
+	}
+	CFRelease(list);
+	return n;
+}

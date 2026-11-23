@@ -9,6 +9,8 @@ typedef struct OFont OFont;
 OG *og_new(int w, int h);
 void og_free(OG *g);
 void *og_bits(OG *g);
+int og_width(OG *g);
+int og_height(OG *g);
 void og_translate(OG *g, float dx, float dy);
 void og_rotate(OG *g, float deg);
 void og_scale(OG *g, float sx, float sy);

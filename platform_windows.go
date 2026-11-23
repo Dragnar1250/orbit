@@ -130,3 +130,6 @@ func fsRefocus() {
 		call(pSetForegroundWindow, fs.hwnd)
 	}
 }
+
+// otherDesktopWidgets: widgets of other apps on the desktop the lyrics should keep clear of (Mac only)
+func otherDesktopWidgets() []RECT { return nil }
