@@ -89,6 +89,8 @@ for i in 1 2 3 4 5 6; do act fullscreen true; sleep 0.4; act fullscreen false; s
 sleep 2; alive "full screen opened and closed 6 times"
 grep -E "full screen|video" "$DIR/orbit.log" | tail -6
 echo "memory while playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
+# where the time goes while playing (macOS's sampler: native + Go stacks)
+sample $PID 5 -mayDie -file /tmp/orbit-sample.txt >/dev/null 2>&1 && awk '/Sort by top of stack/,0' /tmp/orbit-sample.txt | head -45 | sed 's/^/PROFILE /' 
 c0=$(cpu); sleep 20; c1=$(cpu)
 echo "CPU while playing: $(awk -v a=$c0 -v b=$c1 'BEGIN{printf "%.2f s in 20 s = %.2f%% of one core", b-a, (b-a)/20*100}')"
 echo "memory after 20 s playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
