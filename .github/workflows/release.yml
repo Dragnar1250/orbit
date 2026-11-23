@@ -1,0 +1,61 @@
+name: Release
+
+# Push a tag like v1.19.0: Orbit is tested and built. With the repository secret ORBIT_SIGNING_KEY,
+# the update file is signed and everything is published as the latest release. Without it (the key
+# stays with the maintainer), the release is left as a draft: sign orbit-update.json for its
+# Orbit.exe with tools/orbit-sign, attach it, and publish.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # (the tag's message becomes the release notes)
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Version in the code must match the tag
+        run: |
+          v=$(grep -oP 'const appVersion = "\K[^"]+' config.go)
+          if [ "v$v" != "$GITHUB_REF_NAME" ]; then echo "config.go says $v but the tag is $GITHUB_REF_NAME"; exit 1; fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: Tests
+        run: go test -race -count=1 ./...
+      - name: Build
+        run: |
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/Orbit.exe .
+          mkdir -p pkg/Orbit/source && cp dist/Orbit.exe README.txt pkg/Orbit/
+          git ls-files | grep -v '^\.github/' | xargs -I{} cp --parents {} pkg/Orbit/source/
+          (cd pkg && zip -qr ../dist/Orbit-$VERSION-Windows.zip Orbit)
+      - name: Sign the update file (when the key is in the secrets)
+        id: sign
+        env:
+          ORBIT_SIGNING_KEY: ${{ secrets.ORBIT_SIGNING_KEY }}
+        run: |
+          if [ -z "$ORBIT_SIGNING_KEY" ]; then echo "signed=no" >> "$GITHUB_OUTPUT"; echo "No key in the secrets: the release stays a draft to be signed by hand."; exit 0; fi
+          umask 077
+          printf '%s\n' "$ORBIT_SIGNING_KEY" > "$RUNNER_TEMP/key.txt"
+          notes=$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")
+          go run ./tools/orbit-sign -key "$RUNNER_TEMP/key.txt" -exe dist/Orbit.exe -version "$VERSION" -notes "$notes" -out dist/orbit-update.json
+          ORBIT_SIGNING_KEY_FILE="$RUNNER_TEMP/key.txt" go test -count=1 -run TestSigningToolMatchesBuiltInKey .
+          rm -f "$RUNNER_TEMP/key.txt"
+          echo "signed=yes" >> "$GITHUB_OUTPUT"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")"
+          if [ "${{ steps.sign.outputs.signed }}" = "yes" ]; then
+            gh release create "$GITHUB_REF_NAME" dist/Orbit.exe dist/orbit-update.json "dist/Orbit-$VERSION-Windows.zip" \
+              --title "Orbit $VERSION" --notes "$notes" --latest
+          else
+            gh release create "$GITHUB_REF_NAME" dist/Orbit.exe "dist/Orbit-$VERSION-Windows.zip" \
+              --title "Orbit $VERSION" --notes "$notes" --draft
+          fi

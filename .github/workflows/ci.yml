@@ -1,0 +1,71 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Tests (Linux, race detector) + Windows build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Vet
+        run: |
+          go vet ./...
+          GOOS=windows GOARCH=amd64 go vet -unsafeptr=false ./...
+      - name: Tests
+        run: go test -race -count=1 ./...
+      - name: Fuzz (30 s each)
+        run: |
+          for f in FuzzParseQueue FuzzParseSearch FuzzLocalAndMerge FuzzManifest FuzzVersions FuzzSecrets FuzzSearchTyping FuzzParseLRC FuzzSearchURL; do
+            go test -run=NONE -fuzz="^$f\$" -fuzztime=30s . || exit 1
+          done
+      - name: Build Orbit.exe
+        run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o Orbit.exe .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Orbit-exe
+          path: Orbit.exe
+
+  windows:
+    name: Tests + smoke test on real Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Tests (with Windows' own encryption, files and paths)
+        run: go test -count=1 ./...
+      - name: Build
+        run: go build -trimpath -ldflags "-s -w -H windowsgui" -o Orbit.exe .
+      - name: Start Orbit and keep it running for 25 s
+        shell: pwsh
+        run: |
+          $env:APPDATA = "$env:RUNNER_TEMP\appdata"
+          New-Item -ItemType Directory -Force $env:APPDATA | Out-Null
+          $p = Start-Process -FilePath .\Orbit.exe -PassThru
+          Start-Sleep -Seconds 25
+          $log = Get-Content "$env:APPDATA\OrbitLyrics\orbit.log" -ErrorAction SilentlyContinue
+          Write-Host "---- orbit.log ----"; $log | Write-Host
+          $crash = "$env:APPDATA\OrbitLyrics\crash.log"
+          if ((Test-Path $crash) -and ((Get-Item $crash).Length -gt 0)) { Write-Host "---- crash.log ----"; Get-Content $crash | Write-Host; exit 1 }
+          if ($p.HasExited) { Write-Host "Orbit exited with code $($p.ExitCode)"; exit 1 }
+          if (-not ($log -match "Orbit .* starting")) { Write-Host "no start line in the log"; exit 1 }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "Orbit ran 25 s without crashing"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-logs
+          path: ${{ runner.temp }}/appdata/OrbitLyrics/*.log
+          if-no-files-found: ignore

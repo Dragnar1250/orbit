@@ -1,0 +1,8 @@
+# builds and downloads (releases carry these)
+*.exe
+*.zip
+*.test
+/dist/
+# never commit the update signing key
+*signing-key*
+orbit-update.json
