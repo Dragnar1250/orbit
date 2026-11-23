@@ -729,15 +729,15 @@ function pageWidgets() {
     ["glow", "Screen glow", "ShowGlow", () => `<div style="width:78%;height:76%">${glowScreen("cur", false)}</div>`],
   ];
   const grid = h("div", { class: "wgrid" });
-  const mac = S.platform === "darwin"; // the Mac version has the lyrics so far
-  for (const [id, title, key, pv] of cards.filter(c => !mac || c[0] === "lyrics")) {
+  const mac = S.platform === "darwin"; // (full screen isn't on the Mac yet)
+  for (const [id, title, key, pv] of cards) {
     const stage = h("div", { class: "stage" }); stage.innerHTML = pv();
     const sub = h("small", {}, subtitle(id));
     const inp = h("input", { type: "checkbox", checked: !!C[key], "data-key": key, on: { change: e => { set(key, e.target.checked, true); sub.textContent = subtitle(id); } } });
     const sw = h("label", { class: "sw", on: { click: e => e.stopPropagation() } }, inp, h("span"));
     grid.append(h("div", { class: "wbig", "data-w": id, on: { click: () => go(id) } }, stage, h("div", { class: "foot" }, h("div", { class: "l" }, h("b", {}, title), sub), sw)));
   }
-  if (mac) return [h("h3", { style: "margin-top:0" }, "Widgets"), h("p", { class: "lede" }, "Synced lyrics float on your desktop for whatever Spotify or Apple Music plays. The turntable, visualizer, clock, weather, glow and full screen are coming to the Mac."), grid];
+  if (mac) return [h("h3", { style: "margin-top:0" }, "Widgets"), h("p", { class: "lede" }, "Everything Orbit puts on your desktop. Pick one to customize it. (Full screen is coming to the Mac.)"), grid];
   const fst = h("div", { class: "stage fsmini", style: "position:relative;overflow:hidden" });
   setTimeout(() => { fst.innerHTML = C.FsKind === 1 ? skinHTML(140) : fsHTML(140); }, 0);
   const goFs = h("button", { class: "btn primary", "data-act": "fullscreenGo", on: { click: e => { e.stopPropagation(); action("fullscreen", true).then(() => toast("Full screen — Esc to leave")); } } }, "Go");
