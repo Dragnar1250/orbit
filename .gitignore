@@ -6,3 +6,4 @@
 # never commit the update signing key
 *signing-key*
 orbit-update.json
+shots-mac/

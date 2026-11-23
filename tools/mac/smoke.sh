@@ -11,6 +11,7 @@ fail() { echo "::error::$1"; echo "---- orbit.log ----"; cat "$DIR/orbit.log" 2>
 alive() { kill -0 $PID 2>/dev/null || fail "Orbit exited during: $1"; }
 shot() {
   screencapture -x "/tmp/$1.png" 2>/dev/null || { echo "screenshot $1 failed"; return; }
+  mkdir -p shots-mac && cp "/tmp/$1.png" "shots-mac/$1.png"
   sips -Z 512 -s format jpeg "/tmp/$1.png" --out "/tmp/$1.jpg" >/dev/null 2>&1
   base64 -i "/tmp/$1.jpg" | tr -d '\n' | fold -w 3000 | awk -v n="$1" '{printf "SHOT %s %03d %s\n", n, NR-1, $0}'
 }
