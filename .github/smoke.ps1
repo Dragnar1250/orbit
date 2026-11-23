@@ -23,7 +23,14 @@ function Shot($name) {
     $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
-    $bmp.Save("shots\$name.png"); $g.Dispose(); $bmp.Dispose()
+    $bmp.Save("shots\$name.png")
+    # a small copy in the log too (artifacts aren't reachable from everywhere)
+    $w = 720; $h = [int]($b.Height * $w / $b.Width)
+    $sm = New-Object System.Drawing.Bitmap $bmp, $w, $h
+    $ms = New-Object System.IO.MemoryStream
+    $sm.Save($ms, [System.Drawing.Imaging.ImageFormat]::Jpeg)
+    Write-Host ("SHOT {0} {1}" -f $name, [Convert]::ToBase64String($ms.ToArray()))
+    $sm.Dispose(); $ms.Dispose(); $g.Dispose(); $bmp.Dispose()
   } catch { Write-Host "screenshot $name failed: $_" }
 }
 
@@ -68,6 +75,8 @@ Write-Host ("memory after all that: {0:N0} MB" -f $ws)
 
 Act "quit" $true
 if (-not $p.WaitForExit(10000)) { Write-Host "::error::Orbit didn't quit within 10 s"; Dump; exit 1 }
-Alive "quit"
+if ($p.ExitCode -ne 0) { Write-Host "::error::Orbit quit with code $($p.ExitCode)"; Dump; exit 1 }
+$c = Get-Content "$dir\crash.log" -Raw -ErrorAction SilentlyContinue
+if ($c -match "panic:|fatal error:|goroutine \d+") { Write-Host "::error::crash while quitting"; Dump; exit 1 }
 Dump
 Write-Host "Orbit went through everything without crashing"
