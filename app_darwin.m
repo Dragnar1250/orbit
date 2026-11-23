@@ -609,3 +609,18 @@ int os_desktop_widgets(double *out, int max) {
 	CFRelease(list);
 	return n;
 }
+
+// ow_motion: scale every picture of the widget by (sx, sy) around (cx, cy) pixels and show the soft
+// layer at opacity glow — the beat, moved by the GPU
+void ow_motion(void *wp, double sx, double sy, double cx, double cy, double glow) {
+	OrbitWidgetView *v = (OrbitWidgetView *)((__bridge NSWindow *)wp).contentView;
+	double s = os_scale();
+	CALayer *root = v.layer;
+	if (!root.actions) root.actions = @{@"sublayerTransform": NSNull.null};
+	double px = cx / s, py = root.bounds.size.height - cy / s; // (y up)
+	CATransform3D t = CATransform3DMakeTranslation(px, py, 0);
+	t = CATransform3DScale(t, sx, sy, 1);
+	t = CATransform3DTranslate(t, -px, -py, 0);
+	root.sublayerTransform = t;
+	if (v->layers[LSoft]) v->layers[LSoft].opacity = glow;
+}

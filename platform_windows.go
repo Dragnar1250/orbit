@@ -144,4 +144,5 @@ func (w *Widget) useSoft(k float64, only bool)                 {}
 func (w *Widget) gpuLayers() bool                              { return false }
 func (w *Widget) setBase(b *Bitmap, ver int)                   {}
 func (w *Widget) setTop(b *Bitmap, ver int)                    {}
+func (w *Widget) gpuMotion(sx, sy, cx, cy, glow float64)       {}
 func (w *Widget) spin(b *Bitmap, ver int, cx, cy, deg float64) {}

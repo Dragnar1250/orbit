@@ -34,3 +34,4 @@ void os_screens_changed(void);
 int os_desktop_widgets(double *out, int max);
 void ow_layer(void *w, int i, OG *g, double k);
 void ow_spin(void *w, OG *g, int ver, double cx, double cy, double deg);
+void ow_motion(void *w, double sx, double sy, double cx, double cy, double glow);

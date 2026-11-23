@@ -60,6 +60,7 @@ type Widget struct {
 	softBlurR float32
 	baseVer   int
 	topVer    int
+	motion    [5]float64
 	spinShown bool
 }
 
@@ -160,6 +161,17 @@ func softClear(g uintptr) {
 
 // gpuLayers: the Mac turns the record's label and keeps its still picture on the GPU
 func (w *Widget) gpuLayers() bool { return !w.offscreen }
+
+// gpuMotion: the whole picture scaled by (sx, sy) around (cx, cy) and the soft layer's glow at
+// strength glow (0..1) — done by the GPU, nothing is redrawn
+func (w *Widget) gpuMotion(sx, sy, cx, cy, glow float64) {
+	k := [5]float64{sx, sy, cx, cy, glow}
+	if k == w.motion {
+		return
+	}
+	w.motion = k
+	C.ow_motion(unsafe.Pointer(w.win), C.double(sx), C.double(sy), C.double(cx), C.double(cy), C.double(glow))
+}
 
 // setBase / setTop: still pictures under the label (layer 1) and over everything (layer 4),
 // sent when ver changes

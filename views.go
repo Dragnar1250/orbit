@@ -1486,6 +1486,7 @@ type LyricsView struct {
 	last      [2]int
 	shown     bool
 	lineStart time.Time
+	mcx, mcy  float64 // centre of the words in the window (the Mac's beat scaling)
 }
 
 func newLyricsView() *LyricsView {
@@ -1693,6 +1694,17 @@ func (lv *LyricsView) Update(now time.Time, snap MediaSnap, bass float32, ui flo
 			lyrHaze = float32(math.Round(math.Min(1, hz*math.Max(0.3, cfg.MotionAmount))*12) / 12)
 		}
 	}
+	// the Mac moves Glow / Pulse / Stretch on the GPU: the words are drawn once (at full glow, or
+	// at rest) and the glow's strength or the scale follows the beat without redrawing anything
+	beat := lyrMotion
+	glowOnly := cfg.Effect == fxNone || cfg.Effect == fxSoftGlow || cfg.Effect == fxStrongGlow || cfg.Effect == fxNeon // (the beat changes only the soft glow)
+	gpuMotion := lv.w.gpuLayers() && ((cfg.Motion == moGlow && glowOnly) || cfg.Motion == moPulse || cfg.Motion == moStretch)
+	if gpuMotion {
+		lyrMotion = 0
+		if cfg.Motion == moGlow {
+			lyrMotion = 1
+		}
+	}
 	sig += fmt.Sprintf("|%d|%.3f|%.3f|%.2f", cfg.Motion, lyrMotion, lyrHaze, cfg.MotionAmount)
 	if sig != lv.sig || styleDirty || layoutDirty {
 		lv.sig = sig
@@ -1706,6 +1718,23 @@ func (lv *LyricsView) Update(now time.Time, snap MediaSnap, bass float32, ui flo
 			lv.w.alpha = 255
 			lv.w.present()
 		}
+	}
+	if gpuMotion {
+		sx, sy, glow := 1.0, 1.0, 1.0
+		m := float64(beat)
+		switch cfg.Motion {
+		case moGlow: // the glow drawn at its strongest, shown as strong as this beat makes it
+			a := cfg.GlowAmount
+			glow = (a*(1+m*1.4) + m) / (a*2.4 + 1)
+		case moPulse:
+			sx = 1 + 0.09*m
+			sy = sx
+		case moStretch:
+			sx, sy = 1+0.16*m, 1-0.05*m
+		}
+		lv.w.gpuMotion(sx, sy, lv.mcx, lv.mcy, glow)
+	} else if lv.w.gpuLayers() {
+		lv.w.gpuMotion(1, 1, 0, 0, 1)
 	}
 	if !lv.fadeFrom.IsZero() {
 		t := now.Sub(lv.fadeFrom).Seconds() / 0.22
@@ -2786,6 +2815,7 @@ func (lv *LyricsView) render(runs []run, bw, bh float32, F float64, style int) {
 	if editMode {
 		oy += 34
 	}
+	lv.mcx, lv.mcy = float64(ox), float64(oy+bh/2) // (the centre the Mac scales around on the beat)
 	effect := cfg.Effect
 	if style == stNeon {
 		effect = fxNeon
