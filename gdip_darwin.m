@@ -5,12 +5,18 @@
 #import <CoreText/CoreText.h>
 #import <ImageIO/ImageIO.h>
 #import <Accelerate/Accelerate.h>
+#import <IOSurface/IOSurface.h>
 #include "gdip_darwin.h"
 
 struct OG {
 	CGContextRef ctx;
 	int w, h;
 	void *bits;
+	// a widget's canvas draws straight into the IOSurfaces the window server shows (no copy):
+	// one is on screen, the next one is drawn
+	IOSurfaceRef surf[4];
+	CGContextRef sctx[4];
+	int nsurf, cur, locked;
 	CGAffineTransform T;     // the "world transform" (GDI+ terms)
 	CFMutableArrayRef clips; // CGPaths in base space; an even-odd one is stored in eoClips
 	CFMutableArrayRef eoClips;
@@ -82,8 +88,91 @@ OG *og_new(int w, int h) {
 	return g;
 }
 
+static IOSurfaceRef newSurf(int w, int h) {
+	size_t row = IOSurfaceAlignProperty(kIOSurfaceBytesPerRow, (size_t)w * 4);
+	NSDictionary *p = @{
+		(id)kIOSurfaceWidth: @(w), (id)kIOSurfaceHeight: @(h), (id)kIOSurfaceBytesPerElement: @4,
+		(id)kIOSurfaceBytesPerRow: @(row), (id)kIOSurfacePixelFormat: @((unsigned)'BGRA'),
+	};
+	return IOSurfaceCreate((__bridge CFDictionaryRef)p);
+}
+
+// bind surface i as the one drawn on (made when first needed), locked for the CPU
+static int og_bind(OG *g, int i) {
+	if (!g->surf[i]) {
+		g->surf[i] = newSurf(g->w, g->h);
+		if (!g->surf[i]) return 0;
+		IOSurfaceLock(g->surf[i], 0, NULL);
+		g->sctx[i] = CGBitmapContextCreate(IOSurfaceGetBaseAddress(g->surf[i]), g->w, g->h, 8, IOSurfaceGetBytesPerRow(g->surf[i]), rgb(), kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+		IOSurfaceUnlock(g->surf[i], 0, NULL);
+		if (!g->sctx[i]) { CFRelease(g->surf[i]); g->surf[i] = NULL; return 0; }
+		CGContextTranslateCTM(g->sctx[i], 0, g->h);
+		CGContextScaleCTM(g->sctx[i], 1, -1);
+		CGContextSaveGState(g->sctx[i]);
+		if (i >= g->nsurf) g->nsurf = i + 1;
+	}
+	IOSurfaceLock(g->surf[i], 0, NULL);
+	g->locked = 1;
+	g->cur = i;
+	g->ctx = g->sctx[i];
+	g->bits = IOSurfaceGetBaseAddress(g->surf[i]);
+	og_apply(g);
+	return 1;
+}
+
+OG *og_new_surface(int w, int h) {
+	if (w < 1) w = 1;
+	if (h < 1) h = 1;
+	OG *g = calloc(1, sizeof(OG));
+	g->w = w;
+	g->h = h;
+	g->T = CGAffineTransformIdentity;
+	g->clips = CFArrayCreateMutable(NULL, 0, &kCFTypeArrayCallBacks);
+	g->eoClips = CFArrayCreateMutable(NULL, 0, &kCFTypeArrayCallBacks);
+	g->interp = 3;
+	if (!og_bind(g, 0)) {
+		CFRelease(g->clips);
+		CFRelease(g->eoClips);
+		free(g);
+		return NULL;
+	}
+	return g;
+}
+
+// og_surface_show: the surface just drawn, to put on screen (NULL: not a surface canvas)
+void *og_surface_show(OG *g) {
+	if (!g || !g->nsurf) return NULL;
+	if (g->locked) { IOSurfaceUnlock(g->surf[g->cur], 0, NULL); g->locked = 0; }
+	return g->surf[g->cur];
+}
+
+// og_surface_next: drawing starts again after a frame was shown — on a surface the window server
+// isn't reading (its old picture: every widget clears before it draws)
+void og_surface_next(OG *g) {
+	if (!g || !g->nsurf) return;
+	if (g->locked) { IOSurfaceUnlock(g->surf[g->cur], 0, NULL); g->locked = 0; }
+	for (int k = 1; k < 4; k++) { // a free one that exists (usually two are enough)
+		int i = (g->cur + k) % 4;
+		if (g->surf[i] && !IOSurfaceIsInUse(g->surf[i]) && og_bind(g, i)) return;
+	}
+	for (int i = 0; i < 4; i++) // else a new one
+		if (!g->surf[i] && og_bind(g, i)) return;
+	og_bind(g, (g->cur + 1) % 4); // all four busy: the oldest
+}
+
 void og_free(OG *g) {
 	if (!g) return;
+	if (g->nsurf) {
+		if (g->locked) IOSurfaceUnlock(g->surf[g->cur], 0, NULL);
+		for (int i = 0; i < 4; i++) {
+			if (g->sctx[i]) { CGContextRestoreGState(g->sctx[i]); CGContextRelease(g->sctx[i]); }
+			if (g->surf[i]) CFRelease(g->surf[i]);
+		}
+		CFRelease(g->clips);
+		CFRelease(g->eoClips);
+		free(g);
+		return;
+	}
 	CGContextRestoreGState(g->ctx);
 	CGContextRelease(g->ctx);
 	CFRelease(g->clips);

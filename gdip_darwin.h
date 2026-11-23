@@ -63,3 +63,6 @@ void og_fill_path_glow(OG *g, OPath *p, uint32_t fill, uint32_t glow, float blur
 void og_draw_image_alpha(OG *g, OImg *o, float x, float y, float w, float h, float alpha);
 void og_soft_begin(OG *s, OG *g, float k);
 void og_blur(OG *g, float radius);
+OG *og_new_surface(int w, int h);
+void *og_surface_show(OG *g);
+void og_surface_next(OG *g);

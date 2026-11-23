@@ -15,6 +15,7 @@ package main
 import "C"
 
 import (
+	"fmt"
 	"math"
 	"unsafe"
 )
@@ -33,7 +34,23 @@ func og(g uintptr) *C.OG {
 	if g == redirFrom && g != 0 { // between softBegin and softEnd: the soft layer
 		g = redirTo
 	}
+	if onScreen[g] { // its last picture is being shown: draw the next one on a free surface
+		delete(onScreen, g)
+		C.og_surface_next((*C.OG)(unsafe.Pointer(g)))
+	}
 	return (*C.OG)(unsafe.Pointer(g))
+}
+
+// onScreen: surface canvases whose current surface was just handed to the window server
+var onScreen = map[uintptr]bool{}
+
+// newSurfaceCanvas: a widget's canvas, drawn straight into what the window server shows
+func newSurfaceCanvas(w, h int) *Canvas {
+	g := C.og_new_surface(C.int(max(w, 1)), C.int(max(h, 1)))
+	if g == nil {
+		return newCanvas(w, h)
+	}
+	return &Canvas{w: max(w, 1), h: max(h, 1), g: uintptr(unsafe.Pointer(g)), bmp: uintptr(unsafe.Pointer(C.og_img_of(g)))}
 }
 func opath(p uintptr) *C.OPath { return (*C.OPath)(unsafe.Pointer(p)) }
 func open_(p uintptr) *C.OPen  { return (*C.OPen)(unsafe.Pointer(p)) }
@@ -115,7 +132,8 @@ func (c *Canvas) Free() {
 		c.bmp = 0
 	}
 	if c.g != 0 {
-		C.og_free(og(c.g))
+		delete(onScreen, c.g)
+		C.og_free((*C.OG)(unsafe.Pointer(c.g)))
 		c.g = 0
 	}
 }
@@ -382,13 +400,20 @@ func drawGlowPath(g, path uintptr, fill uint32, glow uint32, glowAmt float32, sh
 type Font struct {
 	f    *C.OFont
 	size float32
+	key  string // name|size|bold — for the measure cache
 }
 
 func newFont(name string, size float32, bold bool) *Font {
 	cs := C.CString(name)
 	defer C.free(unsafe.Pointer(cs))
-	return &Font{f: C.og_font(cs, C.float(size), C.int(b2i(bold))), size: size}
+	return &Font{f: C.og_font(cs, C.float(size), C.int(b2i(bold))), size: size, key: fmt.Sprintf("%s|%g|%v", name, size, bold)}
 }
+
+// measured: widths already worked out (the lyrics measure every word every frame; Core Text
+// lays out a whole line for each)
+type measureKey struct{ font, s string }
+
+var measured = map[measureKey][2]float32{}
 
 func (f *Font) Free() {
 	if f != nil && f.f != nil {
@@ -409,10 +434,18 @@ func measure(f *Font, s string) (float32, float32) {
 	if s == "" {
 		return 0, f.size
 	}
+	k := measureKey{f.key, s}
+	if r, ok := measured[k]; ok {
+		return r[0], r[1]
+	}
 	p, n := cstr(s)
 	defer C.free(unsafe.Pointer(p))
 	var w, h C.float
 	C.og_measure(f.f, p, n, &w, &h)
+	if len(measured) > 4096 {
+		clear(measured)
+	}
+	measured[k] = [2]float32{float32(w), float32(h)}
 	return float32(w), float32(h)
 }
 

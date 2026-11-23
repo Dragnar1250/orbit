@@ -256,7 +256,10 @@ type VinylView struct {
 	playing  bool
 	bands    [nBands]float32
 	bass     float32
-	layerVer int // bumped when base / label are rebuilt (the Mac keeps them on the GPU)
+	layerVer int     // bumped when base / label are rebuilt (the Mac keeps them on the GPU)
+	top      *Bitmap // (the Mac) shine and arm, over the turning label
+	topSig   string
+	topVer   int
 }
 
 func newVinylView() *VinylView {
@@ -295,7 +298,8 @@ func (v *VinylView) Update(now time.Time, snap MediaSnap, bands [nBands]float32,
 			v.w.release()
 			v.base.Free()
 			v.label.Free()
-			v.base, v.label, v.sig = nil, nil, ""
+			v.top.Free()
+			v.base, v.label, v.top, v.sig, v.topSig = nil, nil, nil, "", ""
 		}
 		return
 	}
@@ -439,16 +443,33 @@ func (v *VinylView) drawLayered() {
 	if cfg.GrooveLight {
 		v.drawGrooveLight(g)
 	}
-	if cfg.Shine {
-		fillPie(g, 0x14FFFFFF, cx-R, cy-R, 2*R, 2*R, -62, 34)
-		fillPie(g, 0x10FFFFFF, cx-R, cy-R, 2*R, 2*R, 118, 30)
-	}
-	if cfg.ShowArm {
-		v.drawArm(g)
-	}
 	v.w.present()
 	v.w.setBase(v.base, v.layerVer)
 	v.w.spin(v.label, v.layerVer, float64(cx), float64(cy), v.angle)
+	// the shine and the arm stay still while the record turns: a picture of their own, redrawn
+	// when the arm moves on (a little every few seconds) or the look changes
+	topSig := fmt.Sprintf("%d|%v|%v|%.3f|%.3f|%d|%d", v.layerVer, cfg.Shine, cfg.ShowArm, v.progress, v.armT, v.w.w, v.w.h)
+	if topSig != v.topSig {
+		v.topSig = topSig
+		v.topVer++
+		v.top.Free()
+		v.top = nil
+		if cfg.Shine || cfg.ShowArm {
+			v.top = newBitmap(v.w.w, v.w.h)
+		}
+		if v.top != nil {
+			tg := v.top.g
+			gClear(tg, 0)
+			if cfg.Shine {
+				fillPie(tg, 0x14FFFFFF, cx-R, cy-R, 2*R, 2*R, -62, 34)
+				fillPie(tg, 0x10FFFFFF, cx-R, cy-R, 2*R, 2*R, 118, 30)
+			}
+			if cfg.ShowArm {
+				v.drawArm(tg)
+			}
+		}
+	}
+	v.w.setTop(v.top, v.topVer)
 	v.needFull = false
 }
 

@@ -133,8 +133,9 @@ void os_present_free(void **state) {
 
 // A widget's window holds up to four pictures, bottom to top: the soft layer (glows and light,
 // drawn at a quarter of the pixels and stretched by the GPU), a still picture (the record without
-// its label), the turning label (turned by the GPU) and the main picture.
-enum { LSoft, LBase, LSpin, LMain, LCount };
+// its label), the turning label (turned by the GPU), the main picture and a still picture on top
+// (the record's shine and arm).
+enum { LSoft, LBase, LSpin, LMain, LTop, LCount };
 
 static CALayer *newLayer(void) {
 	CALayer *l = [CALayer layer];
@@ -230,14 +231,19 @@ void ow_show(void *wp, OG *g, double x, double y, double w, double h, double alp
 	if (g) {
 		CALayer *m = [v part:LMain];
 		m.hidden = NO;
-		os_present_layer((__bridge void *)m, &v->surfaces[LMain], g, s);
+		IOSurfaceRef sf = og_surface_show(g);
+		if (sf) { // drawn straight into the surface: just show it
+			if (m.contents != (__bridge id)sf) m.contents = (__bridge id)sf;
+			if (m.contentsScale != s) m.contentsScale = s;
+			presentCount++;
+		} else os_present_layer((__bridge void *)m, &v->surfaces[LMain], g, s);
 	} else [v drop:LMain]; // (all of it is on the soft layer)
 	[CATransaction commit];
 	if (win.alphaValue != alpha) win.alphaValue = alpha;
 	if (!win.isVisible) [win orderFrontRegardless];
 }
 
-// ow_layer: picture g (k times the window's pixels) as layer i under the main one; NULL: none
+// ow_layer: picture g (k times the window's pixels) as layer i; NULL: none
 void ow_layer(void *wp, int i, OG *g, double k) {
 	OrbitWidgetView *v = (OrbitWidgetView *)((__bridge NSWindow *)wp).contentView;
 	[CATransaction begin];
