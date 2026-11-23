@@ -34,7 +34,7 @@ shot 02-music-open
 osascript -e 'tell application "Music" to quit' 2>/dev/null; sleep 2; alive "Music closed"
 echo "memory: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
 # idle cost: CPU time used over 20 s of doing nothing
-cpu() { ps -o time= -p $PID | awk -F'[:.]' '{ if (NF==4) print $1*60+$2+$3/100; else print $1*3600+$2*60+$3 }'; }
+cpu() { ps -o time= -p $PID | tr -d ' ' | awk -F: '{ if (NF==3) print $1*3600+$2*60+$3; else print $1*60+$2 }'; } # [h:]m:ss.hh
 c0=$(cpu); sleep 20; c1=$(cpu)
 echo "idle CPU: $(awk -v a=$c0 -v b=$c1 'BEGIN{printf "%.2f s in 20 s = %.2f%% of one core", b-a, (b-a)/20*100}')"
 echo "memory after idling: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
