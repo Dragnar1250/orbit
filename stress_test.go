@@ -96,7 +96,14 @@ func TestStressEverythingAtOnce(t *testing.T) {
 	})
 	wg.Wait()
 	time.Sleep(1500 * time.Millisecond) // let the last background calls finish
-	if p := m.Snapshot().Pos; p < 0 || p > 200.5 {
-		t.Fatalf("position out of range %v", p)
+	// Only "Swim" gets a duration (200 s). The others can be left as the last track with no
+	// duration, where a seek of up to 300 s is kept as is and still runs on for a few seconds.
+	snap := m.Snapshot()
+	limit := 300 + 5.0
+	if snap.Track != nil && snap.Track.Duration > 0 {
+		limit = snap.Track.Duration + 0.5
+	}
+	if p := snap.Pos; p < 0 || p > limit {
+		t.Fatalf("position out of range %v (limit %v)", p, limit)
 	}
 }

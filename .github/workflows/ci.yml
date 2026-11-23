@@ -78,6 +78,15 @@ jobs:
         run: tools/mac/bundle.sh
       - name: Smoke test - start Orbit.app, drive its settings, talk to Apple Music, quit
         run: tools/mac/smoke.sh
+      - name: Screenshots and logs from the smoke test (download from the run's page)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-smoke
+          path: |
+            shots-mac/*.png
+            ~/Library/Application Support/OrbitLyrics/*.log
+          if-no-files-found: ignore
       - name: The disk image opens and holds a working, signed app
         run: |
           hdiutil attach -nobrowse -readonly dist/Orbit-mac.dmg -mountpoint /tmp/orbitdmg
