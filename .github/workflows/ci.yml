@@ -59,3 +59,20 @@ jobs:
             ${{ runner.temp }}/appdata/OrbitLyrics/*.log
             shots/*.png
           if-no-files-found: ignore
+
+  mac:
+    name: Tests, build and smoke test on a real Mac
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Vet
+        run: go vet ./...
+      - name: Tests (with the Mac's own Keychain, files and paths)
+        run: go test -count=1 ./...
+      - name: Build Orbit.app (Apple Silicon + Intel)
+        run: tools/mac/bundle.sh
+      - name: Smoke test - start Orbit.app, drive its settings, talk to Apple Music, quit
+        run: tools/mac/smoke.sh

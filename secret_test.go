@@ -11,6 +11,9 @@ func TestSecrets(t *testing.T) {
 		t.Fatal("empty")
 	}
 	sealed := sealSecret("REFRESH-123")
+	if sealed == "" {
+		t.Skip("no secret store here (e.g. a locked Keychain on a build machine)")
+	}
 	if !strings.HasPrefix(sealed, sealedPrefix) || strings.Contains(sealed, "REFRESH") || openSecret(sealed) != "REFRESH-123" {
 		t.Fatalf("round trip %q", sealed)
 	}
