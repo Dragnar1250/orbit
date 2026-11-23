@@ -148,6 +148,9 @@ static CALayer *newLayer(void) {
 	CALayer *layers[LCount];
 	void *surfaces[LCount];
 	int spinVer;
+	NSRect asked; // the frame last asked for (AppKit rounds it: comparing with window.frame would
+	              // move the window again every frame)
+	double alpha;
 }
 @property int wid;
 @end
@@ -219,7 +222,7 @@ void ow_show(void *wp, OG *g, double x, double y, double w, double h, double alp
 	double s = os_scale();
 	NSRect fr = NSMakeRect(x / s, mainTop() - (y + h) / s, w / s, h / s);
 	OrbitWidgetView *v = (OrbitWidgetView *)win.contentView;
-	if (!NSEqualRects(win.frame, fr)) [win setFrame:fr display:NO];
+	if (!NSEqualRects(v->asked, fr)) { v->asked = fr; [win setFrame:fr display:NO]; }
 	// no explicit transaction: each would be its own trip to the window server; the run loop
 	// sends every widget's change together after the frame
 	CGRect b = CGRectMake(0, 0, w / s, h / s);
@@ -235,7 +238,7 @@ void ow_show(void *wp, OG *g, double x, double y, double w, double h, double alp
 			presentCount++;
 		} else os_present_layer((__bridge void *)m, &v->surfaces[LMain], g, s);
 	} else [v drop:LMain]; // (all of it is on the soft layer)
-	if (win.alphaValue != alpha) win.alphaValue = alpha;
+	if (v->alpha != alpha + 1) { v->alpha = alpha + 1; win.alphaValue = alpha; } // (+1: 0 is "not set yet")
 	if (!win.isVisible) [win orderFrontRegardless];
 }
 
@@ -271,8 +274,14 @@ void ow_spin(void *wp, OG *g, int ver, double cx, double cy, double deg) {
 
 void ow_move(void *wp, double x, double y) {
 	NSWindow *win = (__bridge NSWindow *)wp;
+	OrbitWidgetView *v = (OrbitWidgetView *)win.contentView;
 	double s = os_scale();
-	[win setFrameTopLeftPoint:NSMakePoint(x / s, mainTop() - y / s)];
+	NSRect fr = v->asked;
+	if (fr.size.width <= 0) fr.size = win.frame.size;
+	fr.origin = NSMakePoint(x / s, mainTop() - y / s - fr.size.height);
+	if (NSEqualRects(v->asked, fr)) return;
+	v->asked = fr;
+	[win setFrame:fr display:NO];
 }
 
 void ow_rect(void *wp, double *out) { toPx(((__bridge NSWindow *)wp).frame, out); }
@@ -281,6 +290,7 @@ void ow_hide(void *wp) {
 	[w orderOut:nil];
 	OrbitWidgetView *v = (OrbitWidgetView *)w.contentView;
 	for (int i = 0; i < LCount; i++) [v drop:i]; // hidden widgets keep no pictures
+	v->alpha = 0;
 }
 void ow_mouse(void *wp, int on) { ((__bridge NSWindow *)wp).ignoresMouseEvents = !on; }
 void ow_close(void *wp) { NSWindow *w = (__bridge_transfer NSWindow *)wp; [w orderOut:nil]; [w close]; }
