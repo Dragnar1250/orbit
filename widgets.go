@@ -1,3 +1,5 @@
+//go:build windows || darwin
+
 package main
 
 // Clock, weather and screen glow widgets.
@@ -7,47 +9,10 @@ import (
 	"math"
 	"math/rand"
 	"strings"
-	"syscall"
 	"time"
-	"unsafe"
 )
 
 var fontList []string
-
-var (
-	pGetDateFormatEx   = kernel32.NewProc("GetDateFormatEx")
-	pEnumDisplayMons   = user32.NewProc("EnumDisplayMonitors")
-	pGetMonitorInfoW   = user32.NewProc("GetMonitorInfoW")
-	pMonitorFromWindow = user32.NewProc("MonitorFromWindow")
-	pGetForegroundWnd  = user32.NewProc("GetForegroundWindow")
-	pGetClassNameW2    = user32.NewProc("GetClassNameW")
-	gpSetPathFillMode  = gdiplus.NewProc("GdipSetPathFillMode")
-	gpAddPathPath      = gdiplus.NewProc("GdipAddPathPath")
-)
-
-type systemTime struct{ Year, Month, DayOfWeek, Day, Hour, Minute, Second, Ms uint16 }
-
-// localDate formats a date with Windows in the user's own language ("Pazartesi, 23 Kasım").
-func localDate(t time.Time, picture string) string {
-	st := systemTime{uint16(t.Year()), uint16(t.Month()), uint16(t.Weekday()), uint16(t.Day()), 0, 0, 0, 0}
-	buf := make([]uint16, 128)
-	n := call(pGetDateFormatEx, 0, 0, uintptr(unsafe.Pointer(&st)), uintptr(unsafe.Pointer(u16(picture))), uintptr(unsafe.Pointer(&buf[0])), 128, 0)
-	if n == 0 {
-		return ""
-	}
-	return syscall.UTF16ToString(buf)
-}
-
-func formatDate(t time.Time, long bool) string {
-	pic := "ddd, d MMM"
-	if long {
-		pic = "dddd, d MMMM"
-	}
-	if s := localDate(t, pic); s != "" {
-		return s
-	}
-	return englishDate(t, long)
-}
 
 /* ---------- shared text painting ---------- */
 
@@ -591,14 +556,14 @@ func cityShort(s string) string {
 
 func cloudPath(cx, cy, w float32) uintptr {
 	p := newPath()
-	call(gpSetPathFillMode, p, 1) // winding: overlapping puffs make one shape
+	pathWinding(p) // winding: overlapping puffs make one shape
 	h := w * 0.34
 	r := roundRectPath(cx-w/2, cy-h*0.1, w, h, h/2)
-	call(gpAddPathPath, p, r, 0)
+	addPath(p, r)
 	freePath(r)
 	for _, c := range [][3]float32{{-0.22, 0.02, 0.2}, {0.04, -0.1, 0.28}, {0.27, 0.03, 0.17}} {
 		x, y, rr := cx+c[0]*w, cy+c[1]*w, c[2]*w
-		call(gpAddPathEllipse, p, fl(x-rr), fl(y-rr), fl(2*rr), fl(2*rr))
+		addEllipse(p, x-rr, y-rr, 2*rr, 2*rr)
 	}
 	return p
 }
@@ -629,7 +594,7 @@ func drawMoon(g uintptr, cx, cy, r float32, t float64, alpha float64) {
 	softGlow(g, cx, cy, r*1.9, withAlpha(0xFF9FB4FF, 0.3*alpha))
 	clip := clipCircle(g, cx, cy, r)
 	cut := newPath()
-	call(gpAddPathEllipse, cut, fl(cx-r*0.35), fl(cy-r*1.25), fl(r*1.8), fl(r*1.8))
+	addEllipse(cut, cx-r*0.35, cy-r*1.25, r*1.8, r*1.8)
 	clipExclude(g, cut)
 	fillCircle(g, withAlpha(0xFFEEF0F8, alpha), cx, cy, r)
 	clipReset(g)
@@ -709,47 +674,6 @@ func drawWeatherIcon(g uintptr, kind int, cx, cy, s float32, t float64, anim boo
 }
 
 /* ===================== Screen glow ===================== */
-
-type monitorInfo struct {
-	CbSize  uint32
-	Monitor RECT
-	Work    RECT
-	Flags   uint32
-}
-
-var monList []RECT
-var monPrimary []bool
-
-var enumMonCB = syscall.NewCallback(func(hMon, hdc, rc, lp uintptr) uintptr {
-	mi := monitorInfo{CbSize: uint32(unsafe.Sizeof(monitorInfo{}))}
-	if call(pGetMonitorInfoW, hMon, uintptr(unsafe.Pointer(&mi))) != 0 {
-		monList = append(monList, mi.Monitor)
-		monPrimary = append(monPrimary, mi.Flags&1 != 0)
-	}
-	return 1
-})
-
-func monitors() ([]RECT, []bool) {
-	monList, monPrimary = nil, nil
-	call(pEnumDisplayMons, 0, 0, enumMonCB, 0)
-	return monList, monPrimary
-}
-
-// fullscreenOn: is a full-screen app (game, video) in front on this monitor?
-func fullscreenOn(m RECT) bool {
-	fg := call(pGetForegroundWnd)
-	if fg == 0 {
-		return false
-	}
-	buf := make([]uint16, 64)
-	call(pGetClassNameW2, fg, uintptr(unsafe.Pointer(&buf[0])), 64)
-	if isDesktopClass(syscall.UTF16ToString(buf)) {
-		return false
-	}
-	var r RECT
-	call(pGetWindowRect, fg, uintptr(unsafe.Pointer(&r)))
-	return r.Left <= m.Left && r.Top <= m.Top && r.Right >= m.Right && r.Bottom >= m.Bottom
-}
 
 type glowPart struct {
 	w      *Widget

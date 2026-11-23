@@ -2,18 +2,15 @@
 
 package main
 
-// Orbit for macOS — first version: a menu-bar icon, the settings window (the same page as on
-// Windows), and synced lyrics floating on the desktop for whatever Spotify or Apple Music plays.
+// Orbit for macOS: the same widgets, settings and arranging as on Windows (the drawing and the
+// app logic are shared); this file is the Mac's window and menu side.
 
 /*
 #cgo CFLAGS: -fobjc-arc -Wno-deprecated-declarations
 #cgo LDFLAGS: -framework Cocoa
 #include <stdlib.h>
-void orbit_run(const char *iconPath);
-void orbit_set_lyric(const char *line, const char *next, double alpha, double size, int show, int newLine);
-void orbit_set_rate(double hz);
-void orbit_set_now(const char *now);
-void orbit_quit(void);
+#include "gdip_darwin.h"
+#include "app_darwin.h"
 */
 import "C"
 
@@ -32,130 +29,539 @@ import (
 
 func init() { runtime.LockOSThread() } // Cocoa wants the main thread
 
+/* ---------- widgets ---------- */
+
+type Widget struct {
+	name         string
+	label        string
+	win          uintptr // the NSPanel
+	id           int
+	canvas       *Canvas
+	w, h         int
+	x, y         int // where it is (pixels, from the top-left of the main screen)
+	alpha        byte
+	visible      bool
+	movable      bool
+	onWheel      func(delta int)
+	clickThrough bool
+	dragging     bool
+	offscreen    bool
+	ox, oy       int
+}
+
 var (
-	macLyrVer int
-	macLine   = -2
-	macNow    string
-	macSent   lyricSent // what Cocoa shows now: sent again only when it changes
-	macRate   float64
+	widgets  = map[int]*Widget{}
+	widgetID int
+	editMode bool
 )
 
-type lyricSent struct {
-	line, next  string
-	alpha, size float64
-	show        bool
+func newWidget(name, label string) *Widget {
+	widgetID++
+	w := &Widget{name: name, label: label, alpha: 255, movable: true, id: widgetID, clickThrough: true}
+	w.win = uintptr(C.ow_new(C.int(w.id)))
+	widgets[w.id] = w
+	return w
 }
+
+func (w *Widget) resize(width, height int) {
+	width, height = max(width, 1), max(height, 1)
+	if w.canvas != nil && w.w == width && w.h == height {
+		return
+	}
+	w.canvas.Free()
+	w.canvas = newCanvas(width, height)
+	w.w, w.h = width, height
+}
+
+func (w *Widget) g() uintptr {
+	if w.canvas == nil {
+		return 0
+	}
+	return w.canvas.g
+}
+
+func (w *Widget) level() int {
+	switch {
+	case w.name == "glow" || w.name == "banner":
+		return 2
+	case cfg.Widgets[w.name] != nil && cfg.Widgets[w.name].OnTop:
+		return 1
+	}
+	return 0
+}
+
+func (w *Widget) present() {
+	if w.offscreen {
+		w.visible = w.canvas != nil
+		return
+	}
+	if w.canvas == nil {
+		return
+	}
+	C.ow_level(unsafe.Pointer(w.win), C.int(w.level()))
+	C.ow_show(unsafe.Pointer(w.win), og(w.canvas.g), C.double(w.x), C.double(w.y), C.double(w.w), C.double(w.h), C.double(float64(w.outAlpha())/255))
+	w.visible = true
+}
+
+func (w *Widget) presentDirty(r RECT) { w.present() }
+
+func (w *Widget) hide() {
+	if w.offscreen {
+		w.visible = false
+		return
+	}
+	if w.visible {
+		C.ow_hide(unsafe.Pointer(w.win))
+		w.visible = false
+	}
+}
+
+func (w *Widget) release() {
+	w.hide()
+	if w.canvas != nil {
+		w.canvas.Free()
+		w.canvas = nil
+		w.w, w.h = 0, 0
+	}
+}
+
+func (w *Widget) moveTo(x, y int) {
+	if w.offscreen {
+		w.ox, w.oy = x, y
+		return
+	}
+	if w.dragging {
+		return
+	}
+	w.x, w.y = x, y
+	if w.visible {
+		C.ow_move(unsafe.Pointer(w.win), C.double(x), C.double(y))
+	}
+}
+
+func (w *Widget) rect() RECT {
+	if w.offscreen {
+		return RECT{int32(w.ox), int32(w.oy), int32(w.ox + w.w), int32(w.oy + w.h)}
+	}
+	return RECT{int32(w.x), int32(w.y), int32(w.x + w.w), int32(w.y + w.h)}
+}
+
+func (w *Widget) setClickThrough(on bool) {
+	if w.offscreen || w.clickThrough == on {
+		return
+	}
+	C.ow_mouse(unsafe.Pointer(w.win), C.int(b2i(!on)))
+	w.clickThrough = on
+}
+
+func (w *Widget) capture(on bool) {}
+func releaseCapture()             {}
+func (w *Widget) raiseTop()       { C.ow_level(unsafe.Pointer(w.win), 2) }
+
+// dragging moves the window directly (the drag code sets x/y while w.dragging is on)
+func dragFollow(w *Widget, x, y int) {
+	w.x, w.y = x, y
+	C.ow_move(unsafe.Pointer(w.win), C.double(x), C.double(y))
+}
+
+/* ---------- screens, mouse ---------- */
+
+func workArea() RECT {
+	var r [4]C.double
+	C.os_work_area(&r[0])
+	if r[2] <= 0 {
+		return RECT{0, 0, 1920, 1080}
+	}
+	return RECT{int32(r[0]), int32(r[1]), int32(r[0] + r[2]), int32(r[1] + r[3])}
+}
+
+func monitors() ([]RECT, []bool) {
+	var r [64]C.double
+	n := int(C.os_screens(&r[0], 16))
+	var out []RECT
+	var primary []bool
+	for i := 0; i < n; i++ {
+		out = append(out, RECT{int32(r[4*i]), int32(r[4*i+1]), int32(r[4*i] + r[4*i+2]), int32(r[4*i+1] + r[4*i+3])})
+		primary = append(primary, i == 0)
+	}
+	return out, primary
+}
+
+func fullscreenOn(m RECT) bool { return false } // (a full-screen app has its own Space on the Mac)
+
+func cursorPos() POINT {
+	var x, y C.double
+	C.os_cursor(&x, &y)
+	return POINT{int32(x), int32(y)}
+}
+
+func desktopAt(pt POINT) bool { return C.os_desktop_at(C.double(pt.X), C.double(pt.Y)) != 0 }
+
+var lastClick struct {
+	t    time.Time
+	pt   POINT
+	name string
+	id   int
+	up   bool
+}
+
+func localDate(t time.Time, picture string) string { return "" }
+
+func formatDate(t time.Time, long bool) string {
+	var buf [128]C.char
+	if n := C.os_format_date(C.longlong(t.Unix()), C.int(b2i(long)), &buf[0], 128); n > 0 {
+		return C.GoString(&buf[0])
+	}
+	return englishDate(t, long)
+}
+
+func trayBalloon(title, text string) { logf("%s: %s", title, text) }
+
+/* ---------- full screen (comes to the Mac next) ---------- */
+
+type FullView struct{}
+
+var fs *FullView
+
+func closeFullscreen() {}
+
+/* ---------- start ---------- */
+
+var macLastPt POINT
 
 func main() {
 	logf("Orbit %s starting (macOS)", appVersion)
-	// a small heap, like on Windows: collect a little more often, stay near what is in use
 	debug.SetGCPercent(60)
-	debug.SetMemoryLimit(96 << 20)
+	debug.SetMemoryLimit(160 << 20)
 	if f, err := os.OpenFile(filepath.Join(appDir(), "crash.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
 		fmt.Fprintf(f, "=== %s  Orbit %s started ===\n", time.Now().Format("2006-01-02 15:04:05"), appVersion)
-		debug.SetCrashOutput(f, debug.CrashOptions{}) // a crash leaves its details here
+		debug.SetCrashOutput(f, debug.CrashOptions{})
 		f.Close()
 	}
 	loadConfig()
 	media.SetOffset(cfg.OffsetSec)
-	hooks.Quit = func() { saveConfigIfDue(true); C.orbit_quit() }
+	icon := C.CString(menuIconPath())
+	C.os_run(icon) // → goStarted, then runs until Quit
+	C.free(unsafe.Pointer(icon))
+	saveConfigIfDue(true)
+	logf("exit")
+}
+
+//export goStarted
+func goStarted() {
+	fontList = macFonts()
+	hooks.Fonts = func() []string { return fontList }
+	hooks.Quit = func() { saveConfigIfDue(true); C.os_quit() }
 	hooks.OpenFolder = func() { exec.Command("open", appDir()).Start() }
 	hooks.StartupEnabled = loginItemEnabled
 	hooks.SetStartup = func(on bool) { setLoginItem(on) }
-	hooks.Fonts = macFonts
-	hooks.WidgetInfo = func() map[string]WidgetInfo {
-		return map[string]WidgetInfo{"lyrics": {X: 50, Y: 30, Scale: 1, Visible: cfg.ShowLyrics}}
-	}
+	hooks.SetEditMode = func(on bool) { runOnUI(func() { setEditMode(on) }) }
+	hooks.EditMode = editModeFlag.Load
+	hooks.SettingsChanged = settingsChanged
+	hooks.ResetPositions = resetPositions
+	hooks.WidgetInfo = widgetInfo
+	hooks.SetWidget = setWidget
+	hooks.SetWidgetFlag = setWidgetFlag
+	hooks.Flash = func(name string) { flash(name); requestRedraw() }
+	hooks.SetOpacity = setOpacity
+	hooks.FormatDate = formatDate
 	if srv, err := startSettingsServer(""); err == nil {
 		settingsSrv = srv
 		logf("settings window on 127.0.0.1:%d", srv.port)
 	} else {
 		logf("settings server failed: %v", err)
 	}
+	banner = newWidget("banner", "Arrange")
+	banner.movable = false
+	halo = newHaloView()
+	vinyl = newVinylView()
+	lyricView = newLyricsView()
+	clockView = newClockView()
+	weatherView = newWeatherView()
+	glowView = newGlowView()
 	go macMediaLoop()
+	go weatherLoop(func() (string, float64, float64, bool, bool) {
+		var place string
+		var lat, lon float64
+		var f, want bool
+		withCfg(func() {
+			place, lat, lon, f, want = cfg.WeatherCity, cfg.WeatherLat, cfg.WeatherLon, cfg.WeatherF, cfg.ShowWeather
+		})
+		return place, lat, lon, f, want
+	}, func() { runOnUI(func() { styleDirty = true; requestRedraw() }) })
 	if _, err := os.Stat(filepath.Join(appDir(), "config.json")); err != nil {
 		saveConfigSoon()
 		go func() { time.Sleep(time.Second); openSettings() }()
 	}
-	icon := C.CString(menuIconPath())
-	C.orbit_run(icon) // runs until Quit
-	C.free(unsafe.Pointer(icon))
-	saveConfigIfDue(true)
-	logf("exit")
+	applyFPS()
+	buildMenu()
 }
 
-func openSettings() {
-	if settingsSrv != nil {
-		exec.Command("open", settingsSrv.URL()).Start()
+/* ---------- the frame ---------- */
+
+//export goTick
+func goTick() {
+	defer func() {
+		if r := recover(); r != nil {
+			logf("PANIC while drawing: %v\n%s", r, debug.Stack())
+		}
+	}()
+	drainUI()
+	trimCaches()
+	now := time.Now()
+	snap := media.Snapshot()
+	// the mouse: hover toolbar and dragging (the Mac has no global hook; the pointer is read here)
+	pt := cursorPos()
+	if drag != nil {
+		dragMove(false)
+		if C.os_mouse_down() == 0 {
+			endDrag()
+		}
+	} else if pt != macLastPt {
+		hoverMove(pt)
+	}
+	macLastPt = pt
+	hoverCheck()
+	bands, bass, active := spectrum.Compute()
+	ui := uiScale()
+	vinyl.Update(now, snap, bands, bass, ui)
+	halo.Update(now, snap, bands, bass, active, ui)
+	lyricView.Update(now, snap, bass, ui)
+	clockView.Update(now, snap, bass, ui)
+	weatherView.Update(now, ui)
+	glowView.Update(now, snap, bands, bass, ui)
+	updateBanner()
+	needRedraw, layoutDirty, styleDirty = false, false, false
+	saveConfigIfDue(false)
+	if hoverNote != "" && now.After(hoverNoteUntil) {
+		hoverNote = ""
+		styleDirty = true
+		requestRedraw()
+	}
+	if snap.Version != macTipVer {
+		macTipVer = snap.Version
+		tip := "Orbit — nothing playing"
+		if snap.Track != nil {
+			tip = snap.Track.Title + " — " + snap.Track.Artist
+		}
+		s := C.CString(tip)
+		C.os_set_tooltip(s)
+		C.free(unsafe.Pointer(s))
+	}
+	fps := desktopFPS(snap, now)
+	if fps <= 0 {
+		fps = 5
+	}
+	if hoverName != "" || drag != nil {
+		fps = max(fps, 30)
+	}
+	C.os_set_rate(C.double(fps))
+	if now.Sub(lastTrim) > 2*time.Minute {
+		lastTrim = now
+		runtime.GC()
+		debug.FreeOSMemory()
 	}
 }
 
+var macTipVer = -1
+
+//export goScreensChanged
+func goScreensChanged() { layoutDirty, styleDirty = true, true; requestRedraw() }
+
+//export goWidgetMouse
+func goWidgetMouse(id C.int, kind C.int, delta C.int) {
+	w := widgets[int(id)]
+	if w == nil {
+		return
+	}
+	if w.name == "banner" {
+		if kind == 3 && editMode {
+			setEditMode(false)
+		}
+		return
+	}
+	switch kind {
+	case 1, 6: // down (6: double)
+		if kind == 6 && !editMode && cfg.HoverEdit && w.name == hoverName {
+			doubleClickTheme(w.name)
+			return
+		}
+		if !editMode && w.name == hoverName {
+			if b := toolbarHit(w, cursorPos()); b >= 0 {
+				toolbarAction(w.name, b)
+				return
+			}
+		}
+		if (editMode || w.name == hoverName) && w.movable {
+			beginDrag(w)
+		}
+	case 2:
+		if drag != nil && drag.w == w {
+			dragMove(false)
+		}
+	case 3:
+		if drag != nil && drag.w == w {
+			endDrag()
+		}
+	case 4:
+		wheelResize(w.name, int(delta))
+	}
+	requestRedraw()
+}
+
+/* ---------- settings ---------- */
+
+func setEditMode(on bool) {
+	if drag != nil {
+		endDrag()
+	}
+	editMode = on
+	editModeFlag.Store(on)
+	hoverName, hoverBtn = "", -1
+	for _, w := range widgets {
+		if w.name == "glow" {
+			continue
+		}
+		w.setClickThrough(!on || widgetLocked(w.name))
+	}
+	logf("arrange mode %v", on)
+	bannerSig = ""
+	styleDirty = true
+	requestRedraw()
+	buildMenu()
+}
+
+func setWidgetFlag(name, flag string, on bool) {
+	withCfg(func() {
+		p := cfg.widget(name)
+		if flag == "onTop" {
+			p.OnTop = on
+		} else {
+			p.Locked = on
+		}
+	})
+	saveConfigSoon()
+	if w := widgetByName(name); w != nil {
+		if flag != "onTop" {
+			if drag != nil && on {
+				endDrag()
+			}
+			w.setClickThrough(!editMode || on)
+		}
+		w.present()
+	}
+	flash(name)
+	styleDirty = true
+	requestRedraw()
+}
+
+func settingsChanged(key string) {
+	switch key {
+	case "FPS":
+		applyFPS()
+	case "OffsetSec":
+		media.SetOffset(cfg.OffsetSec)
+	case "WeatherF", "ShowWeather", "WeatherCity":
+		kickWeather()
+	case "VinylCorner", "TextSize", "ShowList", "LyricsPlace":
+		layoutDirty = true
+	}
+	saveConfigSoon()
+	styleDirty = true
+	requestRedraw()
+	buildMenu()
+}
+
+func openSettings() { openSettingsAt("") }
+
+func openSettingsAt(page string) {
+	if settingsSrv == nil {
+		return
+	}
+	u := settingsSrv.URL()
+	if page != "" {
+		u += "#" + page
+	}
+	exec.Command("open", u).Start()
+}
+
+/* ---------- the menu-bar menu ---------- */
+
+var menuWidgets = []struct {
+	label string
+	key   *bool
+}{}
+
+func buildMenu() {
+	C.os_menu_clear()
+	add := func(title string, tag int, checked, enabled bool) {
+		s := C.CString(title)
+		C.os_menu_add(s, C.int(tag), C.int(b2i(checked)), C.int(b2i(enabled)))
+		C.free(unsafe.Pointer(s))
+	}
+	sep := func() { add("", -1, false, false) }
+	snap := media.Snapshot()
+	now := "Nothing playing"
+	if snap.Track != nil {
+		now = snap.Track.Title + " — " + snap.Track.Artist
+	}
+	add(now, 0, false, false)
+	sep()
+	add("Settings…", 1, false, true)
+	add("Arrange widgets", 2, editMode, true)
+	sep()
+	add("Lyrics", 10, cfg.ShowLyrics, true)
+	add("Turntable", 11, cfg.ShowVinyl, true)
+	add("Visualizer", 12, cfg.ShowHalo, true)
+	add("Clock", 13, cfg.ShowClock, true)
+	add("Weather", 14, cfg.ShowWeather, true)
+	add("Screen glow", 15, cfg.ShowGlow, true)
+	sep()
+	add("Play / pause", 3, false, true)
+	add("Next song", 4, false, true)
+	add("Previous song", 5, false, true)
+	sep()
+	add("Quit Orbit", 9, false, true)
+}
+
+//export goMenuOpening
+func goMenuOpening() { buildMenu() }
+
 //export goMenu
 func goMenu(tag C.int) {
+	toggle := func(p *bool, key string) {
+		withCfg(func() { *p = !*p })
+		settingsChanged(key)
+	}
 	switch tag {
 	case 1:
 		openSettings()
 	case 2:
-		withCfg(func() { cfg.ShowLyrics = !cfg.ShowLyrics })
-		saveConfigSoon()
+		setEditMode(!editMode)
 	case 3:
-		macControl("playpause")
+		mediaPlayPause()
 	case 4:
 		macControl("next track")
 	case 5:
 		macControl("previous track")
 	case 9:
 		hooks.Quit()
+	case 10:
+		toggle(&cfg.ShowLyrics, "ShowLyrics")
+	case 11:
+		toggle(&cfg.ShowVinyl, "ShowVinyl")
+	case 12:
+		toggle(&cfg.ShowHalo, "ShowHalo")
+	case 13:
+		toggle(&cfg.ShowClock, "ShowClock")
+	case 14:
+		toggle(&cfg.ShowWeather, "ShowWeather")
+	case 15:
+		toggle(&cfg.ShowGlow, "ShowGlow")
 	}
 }
 
-// goTick: 30 times a second on the main thread — settings changes, the lyric line, the menu.
-//
-//export goTick
-func goTick() {
-	drainUI()
-	saveConfigIfDue(false)
-	snap := media.Snapshot()
-	if snap.Version != macLyrVer {
-		macLyrVer = snap.Version
-		lyrics.Load(snap.Track)
-	}
-	now := "Nothing playing"
-	if snap.Track != nil {
-		now = snap.Track.Title + " — " + snap.Track.Artist
-	}
-	if now != macNow {
-		macNow = now
-		s := C.CString(now)
-		C.orbit_set_now(s)
-		C.free(unsafe.Pointer(s))
-	}
-	line, next, alpha, newLine := macLyricFrame(snap)
-	want := lyricSent{line, next, alpha, macTextSize(), cfg.ShowLyrics}
-	if want != macSent || newLine {
-		macSent = want
-		show, nl := 0, 0
-		if want.show {
-			show = 1
-		}
-		if newLine {
-			nl = 1
-		}
-		l, n := C.CString(line), C.CString(next)
-		C.orbit_set_lyric(l, n, C.double(alpha), C.double(want.size), C.int(show), C.int(nl))
-		C.free(unsafe.Pointer(l))
-		C.free(unsafe.Pointer(n))
-	}
-	// ticks only as often as needed: ~12 a second switches lines on time; 2 when idle
-	rate := 2.0
-	if snap.Track != nil && snap.Playing && cfg.ShowLyrics {
-		rate = 12
-	}
-	if rate != macRate {
-		macRate = rate
-		C.orbit_set_rate(C.double(rate))
-	}
-}
+func mediaPlayPause() { macControl("playpause") }
 
 //export goMediaPing
 func goMediaPing() {
@@ -165,28 +571,14 @@ func goMediaPing() {
 	}
 }
 
-func macTextSize() float64 { return math.Max(18, math.Min(110, float64(cfg.TextSize)*1.1)) } // (main thread: reads cfg directly)
-
-// macLyricFrame: the line to show, the next one, how visible (dimmed while paused), and whether
-// the line just changed (Cocoa fades it in on the GPU).
-func macLyricFrame(snap MediaSnap) (string, string, float64, bool) {
-	if snap.Track == nil {
-		macLine = -2
-		return "", "", 0, false
-	}
-	key, status, ls := lyrics.Get()
-	if key != snap.Track.Key || len(ls) == 0 || (status != lyrSynced && status != lyrPlain) {
-		return "", "", 0, false
-	}
-	return lyricFrame(ls, snap.Pos+visualLead(cfg.LyricsStyle), snap.Playing, cfg.ShowPrevLine, &macLine)
-}
+/* ---------- helpers ---------- */
 
 func menuIconPath() string {
 	exe, err := os.Executable()
 	if err != nil {
 		return ""
 	}
-	p := filepath.Join(filepath.Dir(exe), "..", "Resources", "menubar.png") // inside Orbit.app
+	p := filepath.Join(filepath.Dir(exe), "..", "Resources", "menubar.png")
 	if _, err := os.Stat(p); err == nil {
 		return p
 	}
@@ -197,7 +589,7 @@ func macFonts() []string {
 	out, err := exec.Command("/usr/bin/osascript", "-l", "JavaScript", "-e",
 		"ObjC.import('AppKit'); $.NSFontManager.sharedFontManager.availableFontFamilies.js.map(f => f.js).join('\\n')").Output()
 	if err != nil {
-		return []string{"Helvetica Neue", "SF Pro", "Menlo", "Avenir Next", "Georgia"}
+		return []string{"Helvetica Neue", "Menlo", "Avenir Next", "Georgia"}
 	}
 	var fs []string
 	for _, f := range strings.Split(strings.TrimSpace(string(out)), "\n") {
@@ -208,7 +600,6 @@ func macFonts() []string {
 	return fs
 }
 
-// start at login: a LaunchAgent pointing at this app
 func loginItemPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, "Library", "LaunchAgents", "com.dragnar1250.orbit.plist")
@@ -241,3 +632,5 @@ func setLoginItem(on bool) {
 func xmlEscape(s string) string {
 	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
 }
+
+var _ = math.Pi

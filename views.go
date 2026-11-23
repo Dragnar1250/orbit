@@ -1,3 +1,5 @@
+//go:build windows || darwin
+
 package main
 
 import (
@@ -213,12 +215,12 @@ func editFrame(g uintptr, w, h float32, name, label string) {
 		label += "  ·  locked"
 	}
 	bg := roundRectPath(3, 3, w-6, h-6, 10)
-	call(gpFillPath, g, brush(0x1EFFFFFF), bg)
+	fillPathColor(g, bg, 0x1EFFFFFF)
 	freePath(bg)
 	p := newPen(0xDDFFFFFF, 2)
-	call(gpSetPenDashStyle, p, dashStyleDash)
+	penDash(p)
 	path := roundRectPath(3, 3, w-6, h-6, 10)
-	call(gpDrawPath, g, p, path)
+	drawPathPen(g, p, path)
 	freePath(path)
 	freePen(p)
 	hs := float32(handlePx()) * 0.62
@@ -440,7 +442,7 @@ func (v *VinylView) buildLayers() {
 	v.label = newBitmap(L, L)
 	if v.label != nil {
 		g := v.label.g
-		call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+		setInterp(g, interpHighQualityBicubic)
 		half := float32(L) / 2
 		k := half / (R * 0.99) // local px per record px
 		labelR := half         // cover radius inside this bitmap
@@ -588,14 +590,14 @@ func paintPattern(g uintptr, style int, dc uint32, half float32, key string) {
 			cx, cy := half+(rnd()-0.5)*half*1.6, half+(rnd()-0.5)*half*1.6
 			rx, ry := half*(0.3+rnd()*0.9), half*(0.2+rnd()*0.7)
 			p := newPen(c, w)
-			call(gpDrawArc, g, p, fl(cx-rx), fl(cy-ry), fl(2*rx), fl(2*ry), fl(rnd()*360), fl(80+rnd()*200))
+			drawArc(g, p, cx-rx, cy-ry, 2*rx, 2*ry, rnd()*360, 80+rnd()*200)
 			freePen(p)
 		}
 		for i := 0; i < 10; i++ { // thin white veins
 			cx, cy := half+(rnd()-0.5)*half*1.4, half+(rnd()-0.5)*half*1.4
 			rx, ry := half*(0.2+rnd()*0.8), half*(0.2+rnd()*0.8)
 			p := newPen(0x70FFFFFF, 1+rnd()*1.5)
-			call(gpDrawArc, g, p, fl(cx-rx), fl(cy-ry), fl(2*rx), fl(2*ry), fl(rnd()*360), fl(60+rnd()*160))
+			drawArc(g, p, cx-rx, cy-ry, 2*rx, 2*ry, rnd()*360, 60+rnd()*160)
 			freePen(p)
 		}
 	}
@@ -693,9 +695,9 @@ func (v *VinylView) draw() {
 	if !full {
 		clipRect(g, float32(dirty.Left), float32(dirty.Top), float32(dirty.Right-dirty.Left), float32(dirty.Bottom-dirty.Top))
 	}
-	call(gpSetCompositingMode, g, 1) // copy the cached layer over everything — no separate clear pass
+	setCopyMode(g, true) // copy the cached layer over everything — no separate clear pass
 	gImage(g, v.base.bmp, 0, 0, float32(v.w.w), float32(v.w.h))
-	call(gpSetCompositingMode, g, 0)
+	setCopyMode(g, false)
 	if cfg.AmbVinyl && cfg.AmbBright > 0 {
 		v.drawAmbient(g, full, dirty)
 	}
@@ -791,7 +793,7 @@ func (v *VinylView) drawAmbient(g uintptr, full bool, dirty RECT) {
 		clipRect(g, 0, 0, float32(v.w.w), float32(v.w.h))
 	}
 	disc := newPath()
-	call(gpAddPathEllipse, disc, fl(cx-R), fl(cy-R), fl(2*R), fl(2*R))
+	addEllipse(disc, cx-R, cy-R, 2*R, 2*R)
 	clipExclude(g, disc)
 	bass := float64(v.bass)
 	if !v.playing {
@@ -974,7 +976,7 @@ func (h *HaloView) Update(now time.Time, snap MediaSnap, bands [nBands]float32, 
 		h.label = newBitmap(L, L)
 		if h.label != nil {
 			g := h.label.g
-			call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+			setInterp(g, interpHighQualityBicubic)
 			half := float32(L) / 2
 			fillCircle(g, 0xFF1C1C20, half, half, half)
 			clip := clipCircle(g, half, half, half)
@@ -1137,7 +1139,7 @@ func (h *HaloView) draw(S int, bass float32) {
 					l := 2 + h.bars[i]*maxLen
 					k := int(math.Min(steps-1, float64(h.bars[i])*steps))
 					cs, sn := float32(math.Cos(a)), float32(math.Sin(a))
-					call(gpDrawLine, g, pens[k], fl(c+cs*rb), fl(c+sn*rb), fl(c+cs*(rb+l)), fl(c+sn*(rb+l)))
+					drawLinePen(g, pens[k], c+cs*rb, c+sn*rb, c+cs*(rb+l), c+sn*(rb+l))
 				}
 				for _, p := range pens {
 					freePen(p)

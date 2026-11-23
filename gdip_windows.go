@@ -85,6 +85,9 @@ var (
 	gpFillPolygon                            = gdiplus.NewProc("GdipFillPolygon")
 	gpSetPathGradientCenterColor             = gdiplus.NewProc("GdipSetPathGradientCenterColor")
 	gpSetPathGradientSurroundColorsWithCount = gdiplus.NewProc("GdipSetPathGradientSurroundColorsWithCount")
+	gpSetPathFillMode                        = gdiplus.NewProc("GdipSetPathFillMode")
+	gpAddPathPath                            = gdiplus.NewProc("GdipAddPathPath")
+	gpDrawImageRectRect                      = gdiplus.NewProc("GdipDrawImageRectRect")
 )
 
 const (
@@ -110,8 +113,6 @@ const (
 	combineReplace                = 0
 	matrixPrepend                 = 0
 )
-
-type RectF struct{ X, Y, W, H float32 }
 
 func fl(v float32) uintptr { return uintptr(math.Float32bits(v)) }
 
@@ -436,8 +437,6 @@ func drawTextRight(g uintptr, f *Font, s string, xRight, y, maxW float32, c uint
 	call(gpDrawString, g, uintptr(unsafe.Pointer(&w[0])), uintptr(len(w)-1), f.font, uintptr(unsafe.Pointer(&r)), listFormatRight, brush(c))
 }
 
-type PointF struct{ X, Y float32 }
-
 // fillPathGradient fills a path with a vertical gradient from top to bottom colour.
 func fillPathGradient(g, path uintptr, top, bottom uint32, y0, y1 float32) {
 	if y1 <= y0 {
@@ -605,4 +604,50 @@ func hiconFromBitmap(b *Bitmap) uintptr {
 	var h uintptr
 	call(gpCreateHICONFromBitmap, b.bmp, uintptr(unsafe.Pointer(&h)))
 	return h
+}
+
+/* ---------- small helpers (the same names exist on the Mac, over Core Graphics) ---------- */
+
+func setTextHint(g uintptr, hint int) { call(gpSetTextRenderingHint, g, uintptr(hint)) }
+func setInterp(g uintptr, mode int)   { call(gpSetInterpolationMode, g, uintptr(mode)) }
+func setCopyMode(g uintptr, copy bool) {
+	m := uintptr(0)
+	if copy {
+		m = 1
+	}
+	call(gpSetCompositingMode, g, m)
+}
+func drawPathPen(g, pen, path uintptr) { call(gpDrawPath, g, pen, path) }
+func penDash(p uintptr)                { call(gpSetPenDashStyle, p, dashStyleDash) }
+func drawArc(g, pen uintptr, x, y, w, h, start, sweep float32) {
+	call(gpDrawArc, g, pen, fl(x), fl(y), fl(w), fl(h), fl(start), fl(sweep))
+}
+func drawLinePen(g, pen uintptr, x1, y1, x2, y2 float32) {
+	call(gpDrawLine, g, pen, fl(x1), fl(y1), fl(x2), fl(y2))
+}
+func addEllipse(path uintptr, x, y, w, h float32) {
+	call(gpAddPathEllipse, path, fl(x), fl(y), fl(w), fl(h))
+}
+func addPath(path, other uintptr) { call(gpAddPathPath, path, other, 0) }
+func pathWinding(path uintptr)    { call(gpSetPathFillMode, path, 1) }
+
+// gImageSrc draws the part (sx, sy, sw, sh) of an image into (x, y, w, h).
+func gImageSrc(g, img uintptr, x, y, w, h, sx, sy, sw, sh float32) {
+	call(gpDrawImageRectRect, g, img, fl(x), fl(y), fl(w), fl(h), fl(sx), fl(sy), fl(sw), fl(sh), 2, 0, 0, 0)
+}
+
+// radialFill: an ellipse that fades from center to surround.
+func radialFill(g uintptr, cx, cy, rx, ry float32, center, surround uint32) {
+	p := newPath()
+	addEllipse(p, cx-rx, cy-ry, 2*rx, 2*ry)
+	var br uintptr
+	call(gpCreatePathGradientFromPath, p, uintptr(unsafe.Pointer(&br)))
+	if br != 0 {
+		call(gpSetPathGradientCenterColor, br, uintptr(center))
+		n := int32(1)
+		call(gpSetPathGradientSurroundColorsWithCount, br, uintptr(unsafe.Pointer(&surround)), uintptr(unsafe.Pointer(&n)))
+		call(gpFillPath, g, br, p)
+		call(gpDeleteBrush, br)
+	}
+	freePath(p)
 }

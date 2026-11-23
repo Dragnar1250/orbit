@@ -49,7 +49,7 @@ func (l *skinLayer) ensure(w, h int) *Canvas {
 	if l.c == nil {
 		l.sig = "" // try again next frame
 	} else {
-		call(gpSetTextRenderingHint, l.c.g, 3) // grid-fitted anti-aliasing: crisp small text
+		setTextHint(l.c.g, 3) // grid-fitted anti-aliasing: crisp small text
 	}
 	return l.c
 }
@@ -123,7 +123,7 @@ func (f *FullView) frost(g uintptr, px, py, pw, ph float32, path uintptr) {
 		return
 	}
 	clipPath(g, path)
-	call(gpSetInterpolationMode, g, interpBilinear)
+	setInterp(g, interpBilinear)
 	gImage(g, f.bg.bmp, -px, -py, float32(f.W), float32(f.H))
 	clipReset(g)
 }
@@ -285,7 +285,7 @@ func (f *FullView) skinClock(now time.Time, k float32) {
 		b := pathBounds(p)
 		for i, w := range []float32{26, 14, 6} {
 			pen := newPen(withAlpha(glow, []float64{0.06, 0.1, 0.16}[i]), w*k)
-			call(gpDrawPath, g, pen, p)
+			drawPathPen(g, pen, p)
 			freePen(pen)
 		}
 		fillPathGradient(g, p, top, bot, b.Y, b.Y+b.H)
@@ -301,11 +301,9 @@ func (f *FullView) skinClock(now time.Time, k float32) {
 	f.put(l)
 }
 
-var gpDrawImageRectRect = gdiplus.NewProc("GdipDrawImageRectRect")
-
 // gImagePart draws the part (sx,sy,sw,sh) of img into (x,y,w,h).
 func gImagePart(g, img uintptr, x, y, w, h, sx, sy, sw, sh float32) {
-	call(gpDrawImageRectRect, g, img, fl(x), fl(y), fl(w), fl(h), fl(sx), fl(sy), fl(sw), fl(sh), 2, 0, 0, 0)
+	gImageSrc(g, img, x, y, w, h, sx, sy, sw, sh)
 }
 
 // shadowText: text with a soft dark halo, readable on any cover.
@@ -344,7 +342,7 @@ func (f *FullView) skinList(snap MediaSnap, k float32) {
 		}
 		defer flat.Free()
 		g := flat.g
-		call(gpSetTextRenderingHint, g, 3) // grid-fitted: crisp small text
+		setTextHint(g, 3) // grid-fitted: crisp small text
 		bp := roundRectPath(0, 0, pw, ph, 20*k)
 		f.frost(g, x, y, pw, ph, bp)
 		fillPathColor(g, bp, withAlpha(0xFF0E0E14, 0.35+0.35*cfg.SkinGlass))
@@ -355,7 +353,7 @@ func (f *FullView) skinList(snap MediaSnap, k float32) {
 		hp := roundRectPath(14*k, 14*k, hs, hs, 12*k)
 		if cover.img != 0 && snap.Track != nil {
 			clipPath(g, hp)
-			call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+			setInterp(g, interpHighQualityBicubic)
 			drawCoverSquare(g, cover.img, 14*k, 14*k, hs)
 			clipReset(g)
 		} else {
@@ -398,7 +396,7 @@ func (f *FullView) skinList(snap MediaSnap, k float32) {
 			p := roundRectPath(tx, ty, ts, ts, 8*k)
 			if img := f.thumb(h); img != 0 {
 				clipPath(g, p)
-				call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+				setInterp(g, interpHighQualityBicubic)
 				drawCoverSquare(g, img, tx, ty, ts)
 				clipReset(g)
 			} else {
@@ -506,7 +504,7 @@ func (f *FullView) skinCard(snap MediaSnap, k float32) {
 		p := roundRectPath(cx, 24*k, cs, cs, 20*k)
 		if img != 0 {
 			clipPath(g, p)
-			call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+			setInterp(g, interpHighQualityBicubic)
 			drawCoverSquare(g, img, cx, 24*k, cs)
 			clipReset(g)
 		} else {
@@ -559,7 +557,7 @@ func (f *FullView) flowCard(img uintptr, title, sub string, cs, k float32, front
 		return nil
 	}
 	g := b.g
-	call(gpSetTextRenderingHint, g, 3)
+	setTextHint(g, 3)
 	p := roundRectPath(0.5, 0.5, w-1, h-1, cs*0.07)
 	fillPathGradient(g, p, 0xE8302A30, 0xE8141218, 0, h)
 	if front {
@@ -571,7 +569,7 @@ func (f *FullView) flowCard(img uintptr, title, sub string, cs, k float32, front
 	cp := roundRectPath(pad, pad, cs, cs, cs*0.045)
 	if img != 0 {
 		clipPath(g, cp)
-		call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+		setInterp(g, interpHighQualityBicubic)
 		drawCoverSquare(g, img, pad, pad, cs)
 		clipReset(g)
 	} else {
@@ -839,7 +837,7 @@ func (f *FullView) skinBar(now time.Time, snap MediaSnap, k float32) {
 		p := roundRectPath(tx, ty, ts, ts, 14*k)
 		if cover.img != 0 && snap.Track != nil {
 			clipPath(g, p)
-			call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+			setInterp(g, interpHighQualityBicubic)
 			drawCoverSquare(g, cover.img, tx, ty, ts)
 			clipReset(g)
 		} else {
@@ -1709,7 +1707,7 @@ func (f *FullView) skinDrop(snap MediaSnap, k float32) {
 			}
 			if img != 0 {
 				clipPath(g, p)
-				call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+				setInterp(g, interpHighQualityBicubic)
 				drawCoverSquare(g, img, tx, ty, ts)
 				clipReset(g)
 			} else {

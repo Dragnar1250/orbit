@@ -1,3 +1,5 @@
+//go:build windows || darwin
+
 package main
 
 // Hover mode: point at a widget on the desktop and it can be moved / resized straight away (no

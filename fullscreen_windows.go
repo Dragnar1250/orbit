@@ -957,7 +957,7 @@ func (f *FullView) setupBuffers(q float64) bool {
 	}
 	f.buf = newCanvas(f.W, f.H)
 	if f.buf != nil {
-		call(gpSetTextRenderingHint, f.buf.g, 3) // crisp clock, song info and hints
+		setTextHint(f.buf.g, 3) // crisp clock, song info and hints
 	}
 	f.bg = newCanvas(max(16, f.W/4), max(16, f.H/4))
 	f.bgFull = newCanvas(f.W, f.H)
@@ -1028,25 +1028,9 @@ func (f *FullView) blit() {
 	call(pUpdateLayeredWindow, f.hwnd, 0, 0, uintptr(unsafe.Pointer(&size)), src.dc, uintptr(unsafe.Pointer(&at)), 0, uintptr(unsafe.Pointer(&blend)), ULW_ALPHA)
 }
 
-// radialFill: an ellipse that fades from center to surround.
-func radialFill(g uintptr, cx, cy, rx, ry float32, center, surround uint32) {
-	p := newPath()
-	call(gpAddPathEllipse, p, fl(cx-rx), fl(cy-ry), fl(2*rx), fl(2*ry))
-	var br uintptr
-	call(gpCreatePathGradientFromPath, p, uintptr(unsafe.Pointer(&br)))
-	if br != 0 {
-		call(gpSetPathGradientCenterColor, br, uintptr(center))
-		n := int32(1)
-		call(gpSetPathGradientSurroundColorsWithCount, br, uintptr(unsafe.Pointer(&surround)), uintptr(unsafe.Pointer(&n)))
-		call(gpFillPath, g, br, p)
-		call(gpDeleteBrush, br)
-	}
-	freePath(p)
-}
-
 func strokeArc(g uintptr, c uint32, cx, cy, rx, ry, start, sweep, width float32) {
 	p := newPen(c, width)
-	call(gpDrawArc, g, p, fl(cx-rx), fl(cy-ry), fl(2*rx), fl(2*ry), fl(start), fl(sweep))
+	drawArc(g, p, cx-rx, cy-ry, 2*rx, 2*ry, start, sweep)
 	freePen(p)
 }
 
@@ -1076,7 +1060,7 @@ func (f *FullView) drawBackground(style int) {
 			f.tiny = newBitmap(20, 20)
 			f.tinyK = key
 			if f.tiny != nil {
-				call(gpSetInterpolationMode, f.tiny.g, interpHighQualityBicubic)
+				setInterp(f.tiny.g, interpHighQualityBicubic)
 				drawCoverSquare(f.tiny.g, cover.img, 0, 0, 20)
 			}
 		}
@@ -1085,10 +1069,10 @@ func (f *FullView) drawBackground(style int) {
 			w := float32(math.Max(float64(bw), float64(bh))) * s
 			dx := float32(math.Sin(t*0.041)) * bw * 0.08
 			dy := float32(math.Cos(t*0.033)) * bh * 0.08
-			call(gpSetCompositingMode, g, 1)
-			call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+			setCopyMode(g, true)
+			setInterp(g, interpHighQualityBicubic)
 			gImage(g, f.tiny.bmp, (bw-w)/2+dx, (bh-w)/2+dy, w, w)
-			call(gpSetCompositingMode, g, 0)
+			setCopyMode(g, false)
 			fillRect(g, 0x70000000, 0, 0, bw, bh)
 			softGlow(g, cx, cy, R*2.2, withAlpha(a, 0.18+0.3*bs))
 		}
@@ -1153,7 +1137,7 @@ func (f *FullView) drawBackground(style int) {
 	ey := bh * 0.78
 	radialFill(g, bw/2, bh/2, ex, ey, 0x00000000, 0xA0000000)
 	p := newPath()
-	call(gpAddPathEllipse, p, fl(bw/2-ex), fl(bh/2-ey), fl(2*ex), fl(2*ey))
+	addEllipse(p, bw/2-ex, bh/2-ey, 2*ex, 2*ey)
 	clipExclude(g, p)
 	fillRect(g, 0xA0000000, 0, 0, bw, bh)
 	clipReset(g)
@@ -1170,7 +1154,7 @@ func (f *FullView) drawSharpCover(g uintptr, W, H float32) {
 	if iw, ih := imageSize(img); iw > 0 && ih > 0 {
 		sc := float32(math.Max(float64(W)/float64(iw), float64(H)/float64(ih)))
 		dw, dh := float32(iw)*sc, float32(ih)*sc
-		call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+		setInterp(g, interpHighQualityBicubic)
 		gImage(g, img, (W-dw)/2, (H-dh)*0.35, dw, dh) // keep faces (usually in the upper half) in view
 	}
 	fillRect(g, withAlpha(0xFF000000, cfg.SkinDim), 0, 0, W, H)
@@ -1346,7 +1330,7 @@ func (f *FullView) drawArt(g uintptr) {
 		f.art = newCanvas(S, S)
 		if f.art != nil {
 			ag := f.art.g
-			call(gpSetInterpolationMode, ag, interpHighQualityBicubic)
+			setInterp(ag, interpHighQualityBicubic)
 			rr := float32(S) * 0.035
 			p := roundRectPath(0, 0, float32(S), float32(S), rr)
 			clipPath(ag, p)

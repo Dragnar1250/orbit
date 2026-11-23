@@ -1,0 +1,22 @@
+// Orbit for macOS: the Cocoa functions Go calls (app_darwin.m).
+double os_scale(void);
+void os_work_area(double *out);
+int os_screens(double *out, int max);
+void os_cursor(double *x, double *y);
+int os_mouse_down(void);
+void *ow_new(int wid);
+void ow_level(void *w, int level);
+void ow_show(void *w, OG *g, double x, double y, double wd, double ht, double alpha);
+void ow_move(void *w, double x, double y);
+void ow_rect(void *w, double *out);
+void ow_hide(void *w);
+void ow_mouse(void *w, int on);
+void ow_close(void *w);
+int os_format_date(long long unix, int lng, char *buf, int n);
+void os_menu_clear(void);
+void os_menu_add(const char *title, int tag, int checked, int enabled);
+void os_set_rate(double hz);
+void os_run(const char *iconPath);
+void os_set_tooltip(const char *s);
+void os_quit(void);
+int os_desktop_at(double x, double y);

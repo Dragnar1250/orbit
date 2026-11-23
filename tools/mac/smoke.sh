@@ -24,10 +24,19 @@ echo "settings API answers"
 set_opt() { curl -sf -X POST "$BASE/api/set?t=$TOK" -H 'Content-Type: application/json' -d "{\"key\":\"$1\",\"value\":$2}" >/dev/null || fail "set $1"; }
 act() { curl -sf -X POST "$BASE/api/action?t=$TOK" -H 'Content-Type: application/json' -d "{\"name\":\"$1\",\"value\":$2}" >/dev/null || fail "action $1"; }
 shot 01-start
-for s in $(seq 0 28); do set_opt LyricsStyle $s; done
+for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather ShowGlow; do set_opt $k true; done
+sleep 3; alive "all widgets on"
+shot 02-widgets
+for s in $(seq 0 28); do set_opt LyricsStyle $s; sleep 0.1; done
+for s in 0 1 2 3 4 5; do set_opt HaloStyle $s; sleep 0.3; done; alive "visualizer styles"
+for s in 0 1 2 3; do set_opt DiscStyle $s; sleep 0.3; done; alive "turntable styles"
+for s in 0 1 2 3 4 5; do set_opt ClockStyle $s; sleep 0.3; done; alive "clock styles"
 for v in 20 40 80 120; do set_opt TextSize $v; sleep 0.2; done
-set_opt ShowLyrics false; sleep 0.5; set_opt ShowLyrics true; sleep 0.5
-alive "settings changes"
+act editMode true; sleep 2; alive "arrange mode"; shot 03-arrange
+curl -sf -X POST "$BASE/api/action?t=$TOK" -H 'Content-Type: application/json' -d '{"name":"widget","value":{"name":"vinyl","x":30,"y":60,"scale":1.4}}' >/dev/null || fail "move widget"
+sleep 1; alive "move widget"; act editMode false; sleep 1
+shot 04-moved
+set_opt ShowGlow false
 # Apple Music is on every Mac: start it so Orbit has to talk to it (no song plays here)
 open -g -a Music 2>/dev/null; sleep 6; alive "Music running"
 shot 02-music-open

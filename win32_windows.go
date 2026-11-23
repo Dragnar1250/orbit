@@ -176,10 +176,6 @@ const (
 	ERROR_ALREADY_EXISTS              = 183
 )
 
-type POINT struct{ X, Y int32 }
-type SIZE struct{ CX, CY int32 }
-type RECT struct{ Left, Top, Right, Bottom int32 }
-
 type MSG struct {
 	Hwnd    uintptr
 	Message uint32
