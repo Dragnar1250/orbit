@@ -34,6 +34,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSAudioCaptureUsageDescription</key><string>Orbit listens to the music playing on your Mac so the visualizer and the lyrics can move with it. Nothing is recorded or sent anywhere.</string>
   <key>NSAppleEventsUsageDescription</key><string>Orbit reads which song Spotify or Apple Music is playing to show its lyrics, and can play, pause and skip from its menu.</string>
 </dict></plist>
 PLIST

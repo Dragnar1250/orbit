@@ -5,7 +5,7 @@ set -uo pipefail
 APP=dist/Orbit.app
 DIR="$HOME/Library/Application Support/OrbitLyrics"
 rm -rf "$DIR"
-"$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout.log 2>&1 &
+ORBIT_NO_SETTINGS=1 "$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout.log 2>&1 &
 PID=$!
 fail() { echo "::error::$1"; echo "---- orbit.log ----"; cat "$DIR/orbit.log" 2>/dev/null; echo "---- crash.log ----"; cat "$DIR/crash.log" 2>/dev/null; echo "---- stdout ----"; cat /tmp/orbit-stdout.log; exit 1; }
 alive() { kill -0 $PID 2>/dev/null || fail "Orbit exited during: $1"; }
@@ -39,6 +39,10 @@ curl -sf -X POST "$BASE/api/action?t=$TOK" -H 'Content-Type: application/json' -
 sleep 1; alive "move widget"; act editMode false; sleep 1
 shot 04-moved
 set_opt ShowGlow false
+# the settings in Orbit's own window (no browser)
+act openSettings true; sleep 4; alive "settings window"
+osascript -e 'tell application "System Events" to get name of every window of (first process whose unix id is '$PID')' 2>/dev/null | sed 's/^/windows: /' || true
+shot 05-settings-window
 # Apple Music is on every Mac: start it so Orbit has to talk to it (no song plays here)
 open -g -a Music 2>/dev/null; sleep 6; alive "Music running"
 shot 02-music-open

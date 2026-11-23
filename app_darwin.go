@@ -7,7 +7,7 @@ package main
 
 /*
 #cgo CFLAGS: -fobjc-arc -Wno-deprecated-declarations
-#cgo LDFLAGS: -framework Cocoa -framework QuartzCore
+#cgo LDFLAGS: -framework Cocoa -framework QuartzCore -framework WebKit -framework CoreAudio -framework AudioToolbox
 #include <stdlib.h>
 #include "gdip_darwin.h"
 #include "app_darwin.h"
@@ -23,6 +23,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unsafe"
 )
@@ -265,6 +266,7 @@ func goStarted() {
 	hooks.Flash = func(name string) { flash(name); requestRedraw() }
 	hooks.SetOpacity = setOpacity
 	hooks.FormatDate = formatDate
+	hooks.OpenSettings = openSettings
 	if srv, err := startSettingsServer(""); err == nil {
 		settingsSrv = srv
 		logf("settings window on 127.0.0.1:%d", srv.port)
@@ -280,6 +282,7 @@ func goStarted() {
 	weatherView = newWeatherView()
 	glowView = newGlowView()
 	go macMediaLoop()
+	go audioLoop()
 	go weatherLoop(func() (string, float64, float64, bool, bool) {
 		var place string
 		var lat, lon float64
@@ -291,7 +294,9 @@ func goStarted() {
 	}, func() { runOnUI(func() { styleDirty = true; requestRedraw() }) })
 	if _, err := os.Stat(filepath.Join(appDir(), "config.json")); err != nil {
 		saveConfigSoon()
-		go func() { time.Sleep(time.Second); openSettings() }()
+		if os.Getenv("ORBIT_NO_SETTINGS") == "" { // (the build machine's test opens it itself)
+			go func() { time.Sleep(time.Second); runOnUI(openSettings) }()
+		}
 	}
 	applyFPS()
 	buildMenu()
@@ -331,6 +336,9 @@ func goTick() {
 	weatherView.Update(now, ui)
 	glowView.Update(now, snap, bands, bass, ui)
 	updateBanner()
+	if layoutDirty {
+		logWidgets()
+	}
 	needRedraw, layoutDirty, styleDirty = false, false, false
 	saveConfigIfDue(false)
 	if hoverNote != "" && now.After(hoverNoteUntil) {
@@ -348,6 +356,7 @@ func goTick() {
 		C.os_set_tooltip(s)
 		C.free(unsafe.Pointer(s))
 	}
+	atomic.StoreInt32(&bandsWanted, b2i(wantBands() && snap.Playing))
 	fps := desktopFPS(snap, now)
 	if fps <= 0 {
 		fps = 5
@@ -482,7 +491,62 @@ func openSettingsAt(page string) {
 	if page != "" {
 		u += "#" + page
 	}
-	exec.Command("open", u).Start()
+	s := C.CString(u)
+	C.os_open_settings(s) // Orbit's own window, not a browser
+	C.free(unsafe.Pointer(s))
+}
+
+// goGlobalMouse: clicks and scrolls anywhere (the desktop gets them through the widgets). The
+// same rules as the Windows mouse hook: click the record = play / pause, double-click = colours
+// (or arrange), scroll over a widget = resize.
+//
+//export goGlobalMouse
+func goGlobalMouse(kind, x, y, delta, clicks C.int) {
+	pt := POINT{int32(x), int32(y)}
+	if drag != nil || editMode {
+		return
+	}
+	switch kind {
+	case 4:
+		if name := widgetAt(pt); name != "" && desktopAt(pt) {
+			wheelResize(name, int(delta))
+		}
+	case 1:
+		name := widgetAt(pt)
+		if name == "" || !desktopAt(pt) {
+			lastClick.name = ""
+			return
+		}
+		if clicks >= 2 && lastClick.name == name {
+			lastClick.name = ""
+			if cfg.HoverEdit {
+				doubleClickTheme(name)
+			} else {
+				setEditMode(true)
+				flash(name)
+			}
+			return
+		}
+		lastClick.t, lastClick.pt, lastClick.name = time.Now(), pt, name
+		lastClick.id++
+		lastClick.up = false
+		if name == "vinyl" && cfg.ClickPlay {
+			id := lastClick.id
+			dbl := time.Duration(float64(C.os_double_click_time()) * float64(time.Second))
+			time.AfterFunc(dbl+40*time.Millisecond, func() {
+				runOnUI(func() {
+					if lastClick.id == id && lastClick.name == "vinyl" && lastClick.up && !editMode {
+						mediaPlayPause()
+					}
+				})
+			})
+		}
+	case 3:
+		if lastClick.name != "" && math.Abs(float64(pt.X-lastClick.pt.X)) < 6 && math.Abs(float64(pt.Y-lastClick.pt.Y)) < 6 {
+			lastClick.up = true
+		}
+	}
+	requestRedraw()
 }
 
 /* ---------- the menu-bar menu ---------- */
@@ -633,4 +697,20 @@ func xmlEscape(s string) string {
 	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
 }
 
-var _ = math.Pi
+// logWidgets: where every widget is after a layout change (orbit.log — for "I can't see it").
+var lastWidgetLog string
+
+func logWidgets() {
+	wa := workArea()
+	out := fmt.Sprintf("screen %dx%d (work area %d,%d %dx%d, scale %.1f):", wa.Right, wa.Bottom, wa.Left, wa.Top, wa.Right-wa.Left, wa.Bottom-wa.Top, float64(C.os_scale()))
+	for _, name := range allWidgets {
+		if w := widgetByName(name); w != nil {
+			r := w.rect()
+			out += fmt.Sprintf(" %s=%v@%d,%d %dx%d", name, w.visible, r.Left, r.Top, r.Right-r.Left, r.Bottom-r.Top)
+		}
+	}
+	if out != lastWidgetLog {
+		lastWidgetLog = out
+		logf("%s", out)
+	}
+}

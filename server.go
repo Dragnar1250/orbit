@@ -49,6 +49,8 @@ type Hooks struct {
 	// UpdateInstall: put the downloaded update in place and restart; UpdateReady: one is ready
 	UpdateInstall func()
 	UpdateReady   func()
+	// OpenSettings: show the settings window (the Mac's own window; tests use it)
+	OpenSettings func()
 }
 
 type WidgetInfo struct {
@@ -372,6 +374,10 @@ func (s *SettingsServer) action(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal(req.Value, &b)
 	_ = json.Unmarshal(req.Value, &str)
 	switch req.Name {
+	case "openSettings":
+		if hooks.OpenSettings != nil {
+			runOnUI(hooks.OpenSettings)
+		}
 	case "updateCheck":
 		updater.check(true, func() {
 			if hooks.UpdateReady != nil {

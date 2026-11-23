@@ -2,6 +2,7 @@
 // picture is a CALayer, composited by the GPU), screen and mouse information, dates.
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
+#import <WebKit/WebKit.h>
 #include "_cgo_export.h"
 #include "gdip_darwin.h"
 #include "app_darwin.h"
@@ -146,12 +147,94 @@ int os_format_date(long long unix, int lng, char *buf, int n) {
 
 /* ---------- the menu-bar item ---------- */
 
+/* ---------- the settings window: the same page as on Windows, in Orbit's own window ---------- */
+
+static NSWindow *settingsWin;
+
+@interface OrbitSettingsDelegate : NSObject <NSWindowDelegate, WKUIDelegate, WKNavigationDelegate>
+@end
+@implementation OrbitSettingsDelegate
+- (void)windowWillClose:(NSNotification *)n {
+	// give the page's memory back and leave the Dock again
+	settingsWin.contentView = nil;
+	settingsWin = nil;
+	[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+}
+// links that open a new window (Spotify sign-in, help pages): the default browser
+- (WKWebView *)webView:(WKWebView *)w createWebViewWithConfiguration:(WKWebViewConfiguration *)c forNavigationAction:(WKNavigationAction *)a windowFeatures:(WKWindowFeatures *)f {
+	if (a.request.URL) [[NSWorkspace sharedWorkspace] openURL:a.request.URL];
+	return nil;
+}
+- (void)webView:(WKWebView *)w decidePolicyForNavigationAction:(WKNavigationAction *)a decisionHandler:(void (^)(WKNavigationActionPolicy))h {
+	NSURL *u = a.request.URL;
+	if (u && ![u.host isEqualToString:@"127.0.0.1"] && ![u.scheme isEqualToString:@"about"]) {
+		[[NSWorkspace sharedWorkspace] openURL:u]; // anything outside Orbit: the browser
+		h(WKNavigationActionPolicyCancel);
+		return;
+	}
+	h(WKNavigationActionPolicyAllow);
+}
+- (void)webView:(WKWebView *)w runJavaScriptAlertPanelWithMessage:(NSString *)m initiatedByFrame:(WKFrameInfo *)f completionHandler:(void (^)(void))h {
+	NSAlert *al = [NSAlert new];
+	al.messageText = m;
+	[al runModal];
+	h();
+}
+- (void)webView:(WKWebView *)w runJavaScriptConfirmPanelWithMessage:(NSString *)m initiatedByFrame:(WKFrameInfo *)f completionHandler:(void (^)(BOOL))h {
+	NSAlert *al = [NSAlert new];
+	al.messageText = m;
+	[al addButtonWithTitle:@"OK"];
+	[al addButtonWithTitle:@"Cancel"];
+	h([al runModal] == NSAlertFirstButtonReturn);
+}
+@end
+static OrbitSettingsDelegate *settingsDelegate;
+
+void os_open_settings(const char *url) {
+	NSURL *u = [NSURL URLWithString:[NSString stringWithUTF8String:url]];
+	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; // a normal app with a Dock icon while it is open
+	if (settingsWin) {
+		WKWebView *wv = (WKWebView *)settingsWin.contentView;
+		if ([wv isKindOfClass:[WKWebView class]] && u.fragment.length) [wv loadRequest:[NSURLRequest requestWithURL:u]];
+		[settingsWin makeKeyAndOrderFront:nil];
+		[NSApp activateIgnoringOtherApps:YES];
+		return;
+	}
+	if (!settingsDelegate) settingsDelegate = [OrbitSettingsDelegate new];
+	settingsWin = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1180, 820)
+		styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
+		backing:NSBackingStoreBuffered defer:NO];
+	settingsWin.title = @"Orbit";
+	settingsWin.releasedWhenClosed = NO;
+	settingsWin.minSize = NSMakeSize(720, 520);
+	settingsWin.delegate = settingsDelegate;
+	settingsWin.tabbingMode = NSWindowTabbingModeDisallowed;
+	[settingsWin setFrameAutosaveName:@"OrbitSettings"];
+	WKWebViewConfiguration *c = [WKWebViewConfiguration new];
+	c.websiteDataStore = [WKWebsiteDataStore nonPersistentDataStore];
+	WKWebView *wv = [[WKWebView alloc] initWithFrame:settingsWin.contentView.bounds configuration:c];
+	wv.UIDelegate = settingsDelegate;
+	wv.navigationDelegate = settingsDelegate;
+	wv.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+	[wv setValue:@NO forKey:@"drawsBackground"];
+	settingsWin.contentView = wv;
+	[wv loadRequest:[NSURLRequest requestWithURL:u]];
+	if (!NSEqualPoints(settingsWin.frame.origin, NSZeroPoint)) {} else [settingsWin center];
+	[settingsWin makeKeyAndOrderFront:nil];
+	[NSApp activateIgnoringOtherApps:YES];
+}
+
+int os_settings_open(void) { return settingsWin != nil; }
+
 @interface OrbitDelegate : NSObject <NSApplicationDelegate, NSMenuDelegate>
 @end
 @implementation OrbitDelegate
 - (void)menu:(NSMenuItem *)m { goMenu((int)m.tag); }
 - (void)tick:(NSTimer *)t { goTick(); }
 - (void)menuNeedsUpdate:(NSMenu *)m { goMenuOpening(); }
+// double-clicking Orbit.app again (or its Dock icon) opens the settings
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)a hasVisibleWindows:(BOOL)v { goMenu(1); return NO; }
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)a { return NO; }
 @end
 static OrbitDelegate *delegate;
 
@@ -198,6 +281,16 @@ void os_run(const char *iconPath) {
 		menu.delegate = delegate;
 		statusItem.menu = menu;
 		goStarted();
+		// clicks and scrolls on the desktop (the widgets let them through): play / pause by
+		// clicking the record, double-click to change colours, scroll to resize — like on Windows
+		[NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown | NSEventMaskLeftMouseUp | NSEventMaskScrollWheel handler:^(NSEvent *e) {
+			double x, y;
+			os_cursor(&x, &y);
+			int kind = e.type == NSEventTypeLeftMouseDown ? 1 : e.type == NSEventTypeLeftMouseUp ? 3 : 4;
+			int d = 0;
+			if (kind == 4) d = (int)(e.hasPreciseScrollingDeltas ? e.scrollingDeltaY * 4 : e.scrollingDeltaY * 40);
+			goGlobalMouse(kind, (int)x, (int)y, d, (int)e.clickCount);
+		}];
 		for (NSString *name in @[@"com.spotify.client.PlaybackStateChanged", @"com.apple.Music.playerInfo"]) {
 			[[NSDistributedNotificationCenter defaultCenter] addObserverForName:name object:nil queue:nil usingBlock:^(NSNotification *n) { goMediaPing(); }];
 		}
@@ -230,3 +323,5 @@ int os_desktop_at(double x, double y) {
 	CFRelease(list);
 	return free_;
 }
+
+double os_double_click_time(void) { return NSEvent.doubleClickInterval; }

@@ -20,3 +20,6 @@ void os_run(const char *iconPath);
 void os_set_tooltip(const char *s);
 void os_quit(void);
 int os_desktop_at(double x, double y);
+void os_open_settings(const char *url);
+int os_settings_open(void);
+double os_double_click_time(void);
