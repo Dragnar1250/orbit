@@ -174,11 +174,10 @@ import (
 func init() { runtime.LockOSThread() } // Cocoa wants the main thread
 
 var (
-	settingsSrv *SettingsServer
-	macLyrVer   int
-	macLine     = -2
-	macLineAt   time.Time
-	macNow      string
+	macLyrVer int
+	macLine   = -2
+	macLineAt time.Time
+	macNow    string
 )
 
 func main() {
