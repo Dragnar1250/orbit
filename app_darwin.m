@@ -110,11 +110,8 @@ static void presentOn(CALayer *l, OrbitSurfaces *ps, OG *g, double scale) {
 	else for (int y = 0; y < h; y++) memcpy(dst + y * dstride, src + y * srow, srow);
 	IOSurfaceUnlock(sf, 0, NULL);
 	ps->cur = i;
-	[CATransaction begin];
-	[CATransaction setDisableActions:YES]; // no implicit animation between frames
-	l.contents = (__bridge id)sf;
+	l.contents = (__bridge id)sf; // (no implicit animation: the layers have none)
 	if (l.contentsScale != scale) l.contentsScale = scale;
-	[CATransaction commit];
 	presentCount++;
 	presentSecs += CACurrentMediaTime() - t0;
 }
@@ -223,8 +220,8 @@ void ow_show(void *wp, OG *g, double x, double y, double w, double h, double alp
 	NSRect fr = NSMakeRect(x / s, mainTop() - (y + h) / s, w / s, h / s);
 	OrbitWidgetView *v = (OrbitWidgetView *)win.contentView;
 	if (!NSEqualRects(win.frame, fr)) [win setFrame:fr display:NO];
-	[CATransaction begin];
-	[CATransaction setDisableActions:YES];
+	// no explicit transaction: each would be its own trip to the window server; the run loop
+	// sends every widget's change together after the frame
 	CGRect b = CGRectMake(0, 0, w / s, h / s);
 	for (int i = 0; i < LCount; i++)
 		if (v->layers[i] && i != LSpin && !CGRectEqualToRect(v->layers[i].frame, b)) v->layers[i].frame = b;
@@ -238,7 +235,6 @@ void ow_show(void *wp, OG *g, double x, double y, double w, double h, double alp
 			presentCount++;
 		} else os_present_layer((__bridge void *)m, &v->surfaces[LMain], g, s);
 	} else [v drop:LMain]; // (all of it is on the soft layer)
-	[CATransaction commit];
 	if (win.alphaValue != alpha) win.alphaValue = alpha;
 	if (!win.isVisible) [win orderFrontRegardless];
 }
@@ -246,24 +242,19 @@ void ow_show(void *wp, OG *g, double x, double y, double w, double h, double alp
 // ow_layer: picture g (k times the window's pixels) as layer i; NULL: none
 void ow_layer(void *wp, int i, OG *g, double k) {
 	OrbitWidgetView *v = (OrbitWidgetView *)((__bridge NSWindow *)wp).contentView;
-	[CATransaction begin];
-	[CATransaction setDisableActions:YES];
 	if (!g) [v drop:i];
 	else {
 		CALayer *l = [v part:i];
-		l.frame = v.layer.bounds;
+		if (!CGRectEqualToRect(l.frame, v.layer.bounds)) l.frame = v.layer.bounds;
 		l.hidden = NO;
 		os_present_layer((__bridge void *)l, &v->surfaces[i], g, os_scale() * k);
 	}
-	[CATransaction commit];
 }
 
 // ow_spin: picture g (sent again only when ver changes) centred at (cx, cy) pixels, turned by deg
 void ow_spin(void *wp, OG *g, int ver, double cx, double cy, double deg) {
 	OrbitWidgetView *v = (OrbitWidgetView *)((__bridge NSWindow *)wp).contentView;
 	double s = os_scale();
-	[CATransaction begin];
-	[CATransaction setDisableActions:YES];
 	if (!g) [v drop:LSpin];
 	else {
 		CALayer *l = [v part:LSpin];
@@ -276,7 +267,6 @@ void ow_spin(void *wp, OG *g, int ver, double cx, double cy, double deg) {
 		l.position = CGPointMake(cx / s, v.layer.bounds.size.height - cy / s); // (y up here)
 		l.transform = CATransform3DMakeRotation(-deg * M_PI / 180, 0, 0, 1); // clockwise, as on Windows
 	}
-	[CATransaction commit];
 }
 
 void ow_move(void *wp, double x, double y) {
@@ -290,10 +280,7 @@ void ow_hide(void *wp) {
 	NSWindow *w = (__bridge NSWindow *)wp;
 	[w orderOut:nil];
 	OrbitWidgetView *v = (OrbitWidgetView *)w.contentView;
-	[CATransaction begin];
-	[CATransaction setDisableActions:YES];
 	for (int i = 0; i < LCount; i++) [v drop:i]; // hidden widgets keep no pictures
-	[CATransaction commit];
 }
 void ow_mouse(void *wp, int on) { ((__bridge NSWindow *)wp).ignoresMouseEvents = !on; }
 void ow_close(void *wp) { NSWindow *w = (__bridge_transfer NSWindow *)wp; [w orderOut:nil]; [w close]; }

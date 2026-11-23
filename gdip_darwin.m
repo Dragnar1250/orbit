@@ -17,6 +17,7 @@ struct OG {
 	IOSurfaceRef surf[4];
 	CGContextRef sctx[4];
 	int nsurf, cur, locked;
+	size_t stride;
 	CGAffineTransform T;     // the "world transform" (GDI+ terms)
 	CFMutableArrayRef clips; // CGPaths in base space; an even-odd one is stored in eoClips
 	CFMutableArrayRef eoClips;
@@ -116,6 +117,7 @@ static int og_bind(OG *g, int i) {
 	g->cur = i;
 	g->ctx = g->sctx[i];
 	g->bits = IOSurfaceGetBaseAddress(g->surf[i]);
+	g->stride = IOSurfaceGetBytesPerRow(g->surf[i]);
 	og_apply(g);
 	return 1;
 }
@@ -270,6 +272,11 @@ void og_blur(OG *g, float radius) {
 }
 
 void og_clear(OG *g, uint32_t argb) {
+	if (argb == 0 && CFArrayGetCount(g->clips) == 0 && CFArrayGetCount(g->eoClips) == 0) { // all of it: plain memory
+		size_t row = g->stride ? g->stride : (size_t)g->w * 4;
+		memset(g->bits, 0, row * g->h);
+		return;
+	}
 	CGContextSaveGState(g->ctx);
 	CGContextSetBlendMode(g->ctx, kCGBlendModeCopy);
 	setFill(g->ctx, argb);
