@@ -3,6 +3,7 @@
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
 #import <WebKit/WebKit.h>
+#include <signal.h>
 #include "_cgo_export.h"
 #include "gdip_darwin.h"
 #include "app_darwin.h"
@@ -276,7 +277,7 @@ int os_take_over(void) {
 	for (int i = 0; i < 30 && others.count; i++) {
 		[NSThread sleepForTimeInterval:0.1];
 		NSMutableArray *left = [NSMutableArray array];
-		for (NSRunningApplication *a in others) if (!a.terminated) [left addObject:a];
+		for (NSRunningApplication *a in others) if (kill(a.processIdentifier, 0) == 0) [left addObject:a];
 		others = left;
 	}
 	for (NSRunningApplication *a in others) [a forceTerminate];

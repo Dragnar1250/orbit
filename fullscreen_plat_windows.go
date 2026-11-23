@@ -250,6 +250,9 @@ func (f *FullView) blend(c *Canvas, x, y int, alpha byte) {
 	call(pGdiFlush)
 }
 
+// gpuUpscale: a frame drawn smaller is stretched by the window system (Mac) instead of the CPU.
+const gpuUpscale = false
+
 func (f *FullView) blit() {
 	if f.buf == nil || f.hwnd == 0 {
 		return
@@ -265,4 +268,5 @@ func (f *FullView) blit() {
 	blend := BLENDFUNCTION{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA}
 	call(pUpdateLayeredWindow, f.hwnd, 0, 0, uintptr(unsafe.Pointer(&size)), src.dc, uintptr(unsafe.Pointer(&at)), 0, uintptr(unsafe.Pointer(&blend)), ULW_ALPHA)
 }
+
 var pScreenToClient = user32.NewProc("ScreenToClient")

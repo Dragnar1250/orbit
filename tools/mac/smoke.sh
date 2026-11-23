@@ -101,6 +101,10 @@ sleep 6
 kill -0 $OLD 2>/dev/null && fail "the older Orbit is still running next to the new one"
 alive "the new copy after taking over"
 echo "only one Orbit runs: $(pgrep -x Orbit | wc -l | tr -d ' ')"
+tail -5 "$DIR/orbit.log"
+PORT=$(grep -oE "settings window on 127.0.0.1:[0-9]+" "$DIR/orbit.log" | tail -1 | cut -d: -f2)
+BASE=http://127.0.0.1:${PORT:-47330}
+TOK=$(cat "$DIR/settings.key")
 act quit true; sleep 3
 grep -E "closed [0-9]+ other" "$DIR/orbit.log" | tail -1
 echo "Orbit (macOS) played without crashing"

@@ -690,14 +690,14 @@ func (f *FullView) setupBuffers(q float64) bool {
 	}
 	f.bg = newCanvas(max(16, f.W/4), max(16, f.H/4))
 	f.bgFull = newCanvas(f.W, f.H)
-	if f.q < 1 {
+	if f.q < 1 && !gpuUpscale {
 		f.out = newCanvas(f.winW, f.winH)
 	}
 	f.bgSig, f.artSig, f.lyrX, f.lyrCX, f.lyrCY = "", "", 0, 0, 0
 	if f.glow != nil {
 		f.glow.mons = []RECT{{0, 0, int32(f.W), int32(f.H)}}
 	}
-	return f.buf != nil && f.bg != nil && (f.q == 1 || f.out != nil)
+	return f.buf != nil && f.bg != nil && (f.q == 1 || f.out != nil || gpuUpscale)
 }
 
 // paintBg puts the background on the frame. The small background is drawn at most 24 times a
@@ -1243,7 +1243,6 @@ func (f *FullView) drawHints(g uintptr, now time.Time) {
 		f.pill(g, f.toast, float32(f.W)/2, 64*k, a, font("Segoe UI Semibold", float64(20*k), false))
 	}
 }
-
 
 /* ---------- input (the window system turns its events into these) ---------- */
 

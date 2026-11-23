@@ -58,9 +58,9 @@ func openFullscreen() {
 	W, H := int(m.Right-m.Left), int(m.Bottom-m.Top)
 	f := &FullView{winW: W, winH: H, mon: m, last: time.Now(), ver: -1, lyrIdx: -3, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
 	// big screens: draw at about 1080p and stretch — each pixel costs, and 4K has four times as many
-	q := 1.0 // sharp first: only drawn smaller if this PC turns out too slow (see measure)
-	if W*H > 3840*2160 {
-		q = math.Sqrt(3840 * 2160 / float64(W*H)) // beyond 4K
+	q := 1.0
+	if W*H > 2560*1600 { // Retina: about 2560×1600 worth of pixels, the GPU stretches the rest
+		q = math.Sqrt(2560 * 1600 / float64(W*H))
 	}
 	if !f.setupBuffers(q) {
 		f.free()
@@ -112,16 +112,15 @@ func closeFullscreen() {
 	buildMenu()
 }
 
+// gpuUpscale: on the Mac the layer stretches a smaller frame on the GPU (Retina screens have 3–6×
+// the pixels of 1080p; drawing all of them in software is what made full screen heavy).
+const gpuUpscale = true
+
 func (f *FullView) blit() {
 	if f.buf == nil || f.hwnd == 0 {
 		return
 	}
-	src := f.buf
-	if f.out != nil { // drawn smaller than the screen: stretch it up on all cores
-		scaleBilinear(pix(f.out), f.out.w, f.out.h, pix(f.buf), f.buf.w, f.buf.h)
-		src = f.out
-	}
-	C.fs_show(og(src.g))
+	C.fs_show(og(f.buf.g))
 }
 
 func (f *FullView) blend(c *Canvas, x, y int, alpha byte) {
