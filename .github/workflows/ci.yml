@@ -48,24 +48,14 @@ jobs:
         run: go test -count=1 ./...
       - name: Build
         run: go build -trimpath -ldflags "-s -w -H windowsgui" -o Orbit.exe .
-      - name: Start Orbit and keep it running for 25 s
+      - name: Smoke test - drive Orbit through its settings, full screen and widgets
         shell: pwsh
-        run: |
-          $env:APPDATA = "$env:RUNNER_TEMP\appdata"
-          New-Item -ItemType Directory -Force $env:APPDATA | Out-Null
-          $p = Start-Process -FilePath .\Orbit.exe -PassThru
-          Start-Sleep -Seconds 25
-          $log = Get-Content "$env:APPDATA\OrbitLyrics\orbit.log" -ErrorAction SilentlyContinue
-          Write-Host "---- orbit.log ----"; $log | Write-Host
-          $crash = "$env:APPDATA\OrbitLyrics\crash.log"
-          if ((Test-Path $crash) -and ((Get-Item $crash).Length -gt 0)) { Write-Host "---- crash.log ----"; Get-Content $crash | Write-Host; exit 1 }
-          if ($p.HasExited) { Write-Host "Orbit exited with code $($p.ExitCode)"; exit 1 }
-          if (-not ($log -match "Orbit .* starting")) { Write-Host "no start line in the log"; exit 1 }
-          Stop-Process -Id $p.Id -Force
-          Write-Host "Orbit ran 25 s without crashing"
+        run: ./.github/smoke.ps1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-logs
-          path: ${{ runner.temp }}/appdata/OrbitLyrics/*.log
+          name: windows-smoke
+          path: |
+            ${{ runner.temp }}/appdata/OrbitLyrics/*.log
+            shots/*.png
           if-no-files-found: ignore
