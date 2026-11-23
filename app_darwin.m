@@ -333,7 +333,7 @@ void os_menu_add(const char *title, int tag, int checked, int enabled) {
 // so they are evenly spaced and land just before the screen is redrawn — a timer drifts against
 // the refresh and every so often two frames land in one refresh and none in the next, which
 // looks like stutter. A slow timer is used when little moves (fewer wake-ups).
-static CVDisplayLinkRef link;
+static CVDisplayLinkRef dispLink;
 static _Atomic int linkWant, linkPending, linkDiv, linkCount;
 static double linkRefresh = 60;
 
@@ -351,26 +351,26 @@ static CVReturn linkFired(CVDisplayLinkRef l, const CVTimeStamp *now, const CVTi
 }
 
 static void linkStart(double hz) {
-	if (!link) {
-		if (CVDisplayLinkCreateWithActiveCGDisplays(&link) != kCVReturnSuccess) { link = NULL; return; }
-		CVDisplayLinkSetOutputCallback(link, linkFired, NULL);
+	if (!dispLink) {
+		if (CVDisplayLinkCreateWithActiveCGDisplays(&dispLink) != kCVReturnSuccess) { dispLink = NULL; return; }
+		CVDisplayLinkSetOutputCallback(dispLink, linkFired, NULL);
 	}
-	CVDisplayLinkSetCurrentCGDisplay(link, CGMainDisplayID());
-	double per = CVDisplayLinkGetActualOutputVideoRefreshPeriod(link);
+	CVDisplayLinkSetCurrentCGDisplay(dispLink, CGMainDisplayID());
+	double per = CVDisplayLinkGetActualOutputVideoRefreshPeriod(dispLink);
 	if (per <= 0) {
-		CVTime t = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link);
+		CVTime t = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(dispLink);
 		if (t.timeValue > 0) per = (double)t.timeValue / t.timeScale;
 	}
 	if (per > 0) linkRefresh = 1 / per;
 	int div = (int)lround(linkRefresh / hz);
 	atomic_store(&linkDiv, div < 1 ? 1 : div);
 	atomic_store(&linkWant, 1);
-	if (!CVDisplayLinkIsRunning(link)) CVDisplayLinkStart(link);
+	if (!CVDisplayLinkIsRunning(dispLink)) CVDisplayLinkStart(dispLink);
 }
 
 static void linkStop(void) {
 	atomic_store(&linkWant, 0);
-	if (link && CVDisplayLinkIsRunning(link)) CVDisplayLinkStop(link);
+	if (dispLink && CVDisplayLinkIsRunning(dispLink)) CVDisplayLinkStop(dispLink);
 }
 
 double os_refresh_rate(void) { return linkRefresh; }
@@ -381,7 +381,7 @@ void os_set_rate(double hz) {
 	tickHz = hz;
 	if (hz >= 20) {
 		linkStart(hz);
-		if (link) {
+		if (dispLink) {
 			[tickTimer invalidate];
 			tickTimer = nil;
 			return;
@@ -394,7 +394,7 @@ void os_set_rate(double hz) {
 	[[NSRunLoop mainRunLoop] addTimer:tickTimer forMode:NSRunLoopCommonModes];
 }
 
-void os_screens_changed(void) { if (tickHz >= 20 && link) { double h = tickHz; tickHz = 0; os_set_rate(h); } }
+void os_screens_changed(void) { if (tickHz >= 20 && dispLink) { double h = tickHz; tickHz = 0; os_set_rate(h); } }
 
 // os_take_over: only one Orbit at a time — an Orbit already running (an older copy, another
 // place on disk, a login item) is asked to quit, and stopped if it doesn't within 3 s.
