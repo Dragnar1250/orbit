@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -173,6 +174,7 @@ type stateResp struct {
 	Skies    []constellation       `json:"skies"` // the real constellations (Constellation style previews)
 	Spotify  map[string]any        `json:"spotify"`
 	Update   map[string]any        `json:"update"`
+	Platform string                `json:"platform"` // "windows", "darwin": the page shows what this Orbit has
 	Now      map[string]any        `json:"now"`
 	EditMode bool                  `json:"editMode"`
 	Startup  bool                  `json:"startup"`
@@ -312,9 +314,10 @@ func (s *SettingsServer) state(w http.ResponseWriter) {
 	resp := stateResp{Vis: visNames, Palettes: pal, Cards: visCardNames, Motions: motionNames, Cases: caseNames, Config: cb, Fonts: hooks.Fonts(), Now: now, EditMode: hooks.EditMode(), Startup: hooks.StartupEnabled(),
 		Styles: styleNames, Effects: effectNames, Themes: th, Corners: cornerNames, Discs: discNames, DiscCols: discColorNames, Version: appVersion, Widgets: hooks.WidgetInfo(),
 		All: allWidgets, Weather: weatherSnapshot(), Now2: fmtDate(time.Now(), true), Now3: fmtDate(time.Now(), false),
-		Skies:   constellations,
-		Spotify: map[string]any{"connected": spConnected, "control": spControl, "error": spErr, "redirect": spotifyRedirect(s.port)},
-		Update:  updater.status(),
+		Skies:    constellations,
+		Spotify:  map[string]any{"connected": spConnected, "control": spControl, "error": spErr, "redirect": spotifyRedirect(s.port)},
+		Update:   updater.status(),
+		Platform: runtime.GOOS,
 		Lists: map[string][]string{"clockStyles": clockStyleNames, "fontGroups": fontGroupNames, "clockColors": clockColorNames, "aligns": alignNames,
 			"weatherStyles": weatherStyleNames, "glowStyles": glowStyleNames, "glowWhere": glowWhereNames, "glowModes": glowModeNames,
 			"glowColors": glowColorNames, "glowScreens": glowScreenNames, "weatherKinds": weatherKindNames, "starShapes": starShapeNames,

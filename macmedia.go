@@ -14,20 +14,6 @@ type macNowPlaying struct {
 	Pos, Dur                              float64
 }
 
-// scripts per app (only run when the app is already running: a "tell" never launches it)
-const (
-	macSpotifyScript = `tell application "Spotify"
-	if player state is stopped then return "spotify" & tab & "stopped"
-	set t to current track
-	return "spotify" & tab & (player state as text) & tab & (name of t) & tab & (artist of t) & tab & (album of t) & tab & (player position as text) & tab & ((duration of t) as text) & tab & (artwork url of t)
-end tell`
-	macMusicScript = `tell application "Music"
-	if player state is stopped then return "music" & tab & "stopped"
-	set t to current track
-	return "music" & tab & (player state as text) & tab & (name of t) & tab & (artist of t) & tab & (album of t) & tab & (player position as text) & tab & ((duration of t) as text) & tab & ""
-end tell`
-)
-
 // macNumber reads AppleScript numbers in any locale ("12,5" in Turkish, "1.234,5", "3.0E+2").
 func macNumber(s string) float64 {
 	s = strings.TrimSpace(s)
@@ -90,4 +76,58 @@ func pickMacPlayer(sp, mu macNowPlaying, spOK, muOK bool) (macNowPlaying, bool) 
 		return mu, true
 	}
 	return macNowPlaying{}, false
+}
+
+// lyricFrame (the Mac's lyrics window): the line at position p, the next one, its visibility
+// (dimmed while paused), and whether the line changed since *last.
+func lyricFrame(ls []Line, p float64, playing, showNext bool, last *int) (string, string, float64, bool) {
+	i := lineAt(ls, p)
+	changed := i != *last
+	*last = i
+	if i < 0 || i >= len(ls) || strings.TrimSpace(ls[i].Text) == "" {
+		return "", "", 0, false
+	}
+	next := ""
+	if showNext && i+1 < len(ls) {
+		next = ls[i+1].Text
+	}
+	a := 1.0
+	if !playing {
+		a = 0.55
+	}
+	return ls[i].Text, next, a, changed
+}
+
+// macPlayersScript: one JavaScript-for-Automation run asks both players — one process instead of
+// several, and a player that isn't open is skipped without starting it. One line per player.
+const macPlayersScript = `function run() {
+  var out = [], c = function (s) { return String(s === undefined || s === null ? "" : s).replace(/[\t\r\n]+/g, " "); };
+  [["Spotify", "spotify"], ["Music", "music"]].forEach(function (p) {
+    try {
+      var a = Application(p[0]);
+      if (!a.running()) return;
+      var st = c(a.playerState());
+      if (st === "stopped") { out.push(p[1] + "\tstopped"); return; }
+      var t = a.currentTrack, art = "";
+      if (p[1] === "spotify") { try { art = c(t.artworkUrl()); } catch (e) {} }
+      out.push([p[1], st, c(t.name()), c(t.artist()), c(t.album()), c(a.playerPosition()), c(t.duration()), art].join("\t"));
+    } catch (e) {}
+  });
+  return out.join("\n");
+}`
+
+// parseMacPlayers: the script's answer → the player to follow.
+func parseMacPlayers(out string) (macNowPlaying, bool) {
+	var sp, mu macNowPlaying
+	var spOK, muOK bool
+	for _, ln := range strings.Split(out, "\n") {
+		n, ok := parseMacNowPlaying(ln)
+		switch n.App {
+		case "spotify":
+			sp, spOK = n, ok
+		case "music":
+			mu, muOK = n, ok
+		}
+	}
+	return pickMacPlayer(sp, mu, spOK, muOK)
 }

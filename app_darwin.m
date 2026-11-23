@@ -14,7 +14,7 @@
 @implementation OrbitLyricView
 - (BOOL)isFlipped { return YES; }
 - (void)drawRect:(NSRect)dirty {
-	if (self.line.length == 0 || self.alpha <= 0.01) return;
+	if (self.line.length == 0) return;
 	NSShadow *sh = [NSShadow new];
 	sh.shadowBlurRadius = 14;
 	sh.shadowOffset = NSMakeSize(0, -1);
@@ -23,7 +23,7 @@
 	ps.alignment = NSTextAlignmentCenter;
 	ps.lineBreakMode = NSLineBreakByWordWrapping;
 	NSDictionary *a = @{NSFontAttributeName: [NSFont systemFontOfSize:self.size weight:NSFontWeightBold],
-		NSForegroundColorAttributeName: [NSColor colorWithWhite:1 alpha:self.alpha],
+		NSForegroundColorAttributeName: NSColor.whiteColor, // fading is the layer's opacity (done by the GPU)
 		NSShadowAttributeName: sh, NSParagraphStyleAttributeName: ps};
 	NSRect b = self.bounds;
 	CGFloat w = b.size.width - 40;
@@ -32,7 +32,7 @@
 	NSDictionary *a2 = nil;
 	if (self.next.length) {
 		a2 = @{NSFontAttributeName: [NSFont systemFontOfSize:self.size * 0.5 weight:NSFontWeightMedium],
-			NSForegroundColorAttributeName: [NSColor colorWithWhite:1 alpha:self.alpha * 0.55],
+			NSForegroundColorAttributeName: [NSColor colorWithWhite:1 alpha:0.55],
 			NSShadowAttributeName: sh, NSParagraphStyleAttributeName: ps};
 		h2 = [self.next boundingRectWithSize:NSMakeSize(w, 10000) options:NSStringDrawingUsesLineFragmentOrigin attributes:a2].size.height + 8;
 	}
@@ -54,6 +54,19 @@ static OrbitLyricView *lyricView;
 static NSStatusItem *statusItem;
 static OrbitDelegate *delegate;
 static NSMenuItem *nowItem, *lyricsItem;
+static NSTimer *tickTimer;
+static double tickHz;
+
+// orbit_set_rate: how often Go is asked for the next frame (2 a second when idle, more while
+// a song plays) — the fades themselves run on the GPU without any ticks.
+void orbit_set_rate(double hz) {
+	if (hz == tickHz) return;
+	tickHz = hz;
+	[tickTimer invalidate];
+	tickTimer = [NSTimer timerWithTimeInterval:1.0 / hz target:delegate selector:@selector(tick:) userInfo:nil repeats:YES];
+	tickTimer.tolerance = 0.2 / hz; // lets macOS group wake-ups (saves power)
+	[[NSRunLoop mainRunLoop] addTimer:tickTimer forMode:NSRunLoopCommonModes];
+}
 
 static NSMenuItem *addItem(NSMenu *m, NSString *title, int tag) {
 	NSMenuItem *it = [[NSMenuItem alloc] initWithTitle:title action:@selector(menu:) keyEquivalent:@""];
@@ -84,8 +97,10 @@ void orbit_run(const char *iconPath) {
 		lyricWin.level = CGWindowLevelForKey(kCGDesktopIconWindowLevelKey) + 1; // on the desktop, under every window
 		lyricWin.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorStationary | NSWindowCollectionBehaviorIgnoresCycle;
 		lyricView = [[OrbitLyricView alloc] initWithFrame:NSMakeRect(0, 0, 800, 240)];
+		lyricView.wantsLayer = YES; // composited on the GPU
+		lyricView.layerContentsRedrawPolicy = NSViewLayerContentsRedrawOnSetNeedsDisplay; // redrawn only when the text changes
 		lyricView.size = 44;
-		lyricView.alpha = 0;
+		lyricView.alphaValue = 0;
 		lyricWin.contentView = lyricView;
 		placeLyrics();
 		[lyricWin orderFront:nil];
@@ -116,25 +131,33 @@ void orbit_run(const char *iconPath) {
 		menu.autoenablesItems = NO;
 		statusItem.menu = menu;
 
-		NSTimer *t = [NSTimer timerWithTimeInterval:1.0 / 30 target:delegate selector:@selector(tick:) userInfo:nil repeats:YES];
-		[[NSRunLoop mainRunLoop] addTimer:t forMode:NSRunLoopCommonModes];
+		orbit_set_rate(2);
+		// Spotify and Music announce every change: Orbit asks them only then (and now and then)
+		for (NSString *name in @[@"com.spotify.client.PlaybackStateChanged", @"com.apple.Music.playerInfo"]) {
+			[[NSDistributedNotificationCenter defaultCenter] addObserverForName:name object:nil queue:nil usingBlock:^(NSNotification *n) { goMediaPing(); }];
+		}
 		[NSApp run];
 	}
 }
 
 // called on the main thread (from goTick)
-void orbit_set_lyric(const char *line, const char *next, double alpha, double size, int show) {
+// Go calls this only when something changed. A new line fades in on the GPU; a pause dims it.
+void orbit_set_lyric(const char *line, const char *next, double alpha, double size, int show, int newLine) {
 	NSString *l = [NSString stringWithUTF8String:line];
 	NSString *n = [NSString stringWithUTF8String:next];
-	BOOL changed = ![l isEqualToString:lyricView.line ?: @""] || ![n isEqualToString:lyricView.next ?: @""] || fabs(alpha - lyricView.alpha) > 0.004 || size != lyricView.size;
+	BOOL text = ![l isEqualToString:lyricView.line ?: @""] || ![n isEqualToString:lyricView.next ?: @""] || size != lyricView.size;
 	lyricView.line = l;
 	lyricView.next = n;
-	lyricView.alpha = alpha;
 	lyricView.size = size;
 	lyricsItem.state = show ? NSControlStateValueOn : NSControlStateValueOff;
 	if (show && !lyricWin.isVisible) [lyricWin orderFront:nil];
 	if (!show && lyricWin.isVisible) [lyricWin orderOut:nil];
-	if (changed) lyricView.needsDisplay = YES;
+	if (text) lyricView.needsDisplay = YES;
+	if (newLine) lyricView.alphaValue = 0;
+	[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
+		ctx.duration = newLine ? 0.25 : 0.4;
+		lyricView.animator.alphaValue = alpha;
+	}];
 }
 
 void orbit_set_now(const char *now) {

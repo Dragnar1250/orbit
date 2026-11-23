@@ -13,56 +13,61 @@ import (
 
 var macApp string // "spotify" / "music": the one last seen playing (the menu's controls go there)
 
+var mediaPing = make(chan struct{}, 1) // Spotify / Music announced a change
+
 func running(name string) bool { return exec.Command("/usr/bin/pgrep", "-xq", name).Run() == nil }
 
 func osascript(script string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "/usr/bin/osascript", "-e", script).Output()
 	return string(out), err
 }
 
+func jxa(script string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "/usr/bin/osascript", "-l", "JavaScript", "-e", script).Output()
+	return string(out), err
+}
+
+// macMediaLoop asks the players when they announce a change, otherwise only now and then to keep
+// the position exact: every 4 s while playing, 8 s when paused or nothing plays.
 func macMediaLoop() {
 	var lastKey string
-	denied := map[string]bool{}
+	warned := false
 	for {
-		var sp, mu macNowPlaying
-		var spOK, muOK bool
-		if running("Spotify") {
-			out, err := osascript(macSpotifyScript)
-			if err != nil && !denied["spotify"] {
-				denied["spotify"] = true
-				logf("Spotify didn't answer (allow Orbit in System Settings → Privacy & Security → Automation): %v", err)
-			}
-			sp, spOK = parseMacNowPlaying(out)
+		out, err := jxa(macPlayersScript)
+		if err != nil && !warned {
+			warned = true
+			logf("the music apps didn't answer (allow Orbit in System Settings → Privacy & Security → Automation): %v", err)
 		}
-		if running("Music") {
-			out, err := osascript(macMusicScript)
-			if err != nil && !denied["music"] {
-				denied["music"] = true
-				logf("Music didn't answer (Automation permission?): %v", err)
-			}
-			mu, muOK = parseMacNowPlaying(out)
-		}
-		n, ok := pickMacPlayer(sp, mu, spOK, muOK)
+		n, ok := parseMacPlayers(out)
+		wait := 8 * time.Second
 		if !ok {
 			media.SetTrack("", "", "", "")
 			lastKey = ""
-			time.Sleep(1500 * time.Millisecond)
-			continue
+		} else {
+			macApp = n.App
+			media.SetTrack(n.Title, n.Artist, n.Album, n.App)
+			key := keyOf(n.Title, n.Artist)
+			if n.Dur > 0 {
+				media.SetDuration(key, n.Dur)
+			}
+			media.SetPosition(n.Pos, n.State == "playing")
+			if key != lastKey {
+				lastKey = key
+				go macCover(key, n)
+			}
+			if n.State == "playing" {
+				wait = 4 * time.Second
+			}
 		}
-		macApp = n.App
-		media.SetTrack(n.Title, n.Artist, n.Album, n.App)
-		key := keyOf(n.Title, n.Artist)
-		if n.Dur > 0 {
-			media.SetDuration(key, n.Dur)
+		select {
+		case <-mediaPing:
+			time.Sleep(150 * time.Millisecond) // the player finishes its own update first
+		case <-time.After(wait):
 		}
-		media.SetPosition(n.Pos, n.State == "playing")
-		if key != lastKey {
-			lastKey = key
-			go macCover(key, n)
-		}
-		time.Sleep(700 * time.Millisecond)
 	}
 }
 

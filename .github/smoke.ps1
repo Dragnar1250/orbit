@@ -73,6 +73,10 @@ for ($i = 0; $i -lt 8; $i++) { Act "fullscreen" $true; Start-Sleep -Milliseconds
 Start-Sleep 2; Alive "open/close 8 times"
 $ws = (Get-Process -Id $p.Id).WorkingSet64 / 1MB
 Write-Host ("memory after all that: {0:N0} MB" -f $ws)
+# idle cost: CPU time used over 20 s with full screen closed and nothing playing
+$c0 = (Get-Process -Id $p.Id).TotalProcessorTime.TotalSeconds; Start-Sleep 20; $c1 = (Get-Process -Id $p.Id).TotalProcessorTime.TotalSeconds
+Write-Host ("idle CPU: {0:N2} s in 20 s = {1:N2}% of one core" -f ($c1 - $c0), (($c1 - $c0) / 20 * 100))
+Write-Host ("memory after idling: {0:N0} MB" -f ((Get-Process -Id $p.Id).WorkingSet64 / 1MB))
 
 Act "quit" $true
 if (-not $p.WaitForExit(10000)) { Write-Host "::error::Orbit didn't quit within 10 s"; Dump; exit 1 }

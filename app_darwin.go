@@ -10,7 +10,8 @@ package main
 #cgo LDFLAGS: -framework Cocoa
 #include <stdlib.h>
 void orbit_run(const char *iconPath);
-void orbit_set_lyric(const char *line, const char *next, double alpha, double size, int show);
+void orbit_set_lyric(const char *line, const char *next, double alpha, double size, int show, int newLine);
+void orbit_set_rate(double hz);
 void orbit_set_now(const char *now);
 void orbit_quit(void);
 */
@@ -34,12 +35,22 @@ func init() { runtime.LockOSThread() } // Cocoa wants the main thread
 var (
 	macLyrVer int
 	macLine   = -2
-	macLineAt time.Time
 	macNow    string
+	macSent   lyricSent // what Cocoa shows now: sent again only when it changes
+	macRate   float64
 )
+
+type lyricSent struct {
+	line, next  string
+	alpha, size float64
+	show        bool
+}
 
 func main() {
 	logf("Orbit %s starting (macOS)", appVersion)
+	// a small heap, like on Windows: collect a little more often, stay near what is in use
+	debug.SetGCPercent(60)
+	debug.SetMemoryLimit(96 << 20)
 	if f, err := os.OpenFile(filepath.Join(appDir(), "crash.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
 		fmt.Fprintf(f, "=== %s  Orbit %s started ===\n", time.Now().Format("2006-01-02 15:04:05"), appVersion)
 		debug.SetCrashOutput(f, debug.CrashOptions{}) // a crash leaves its details here
@@ -119,53 +130,55 @@ func goTick() {
 		C.orbit_set_now(s)
 		C.free(unsafe.Pointer(s))
 	}
-	line, next, alpha := macLyricFrame(snap, time.Now())
-	var show C.int
-	withCfg(func() {
-		if cfg.ShowLyrics {
+	line, next, alpha, newLine := macLyricFrame(snap)
+	want := lyricSent{line, next, alpha, macTextSize(), cfg.ShowLyrics}
+	if want != macSent || newLine {
+		macSent = want
+		show, nl := 0, 0
+		if want.show {
 			show = 1
 		}
-	})
-	l, n := C.CString(line), C.CString(next)
-	C.orbit_set_lyric(l, n, C.double(alpha), C.double(macTextSize()), show)
-	C.free(unsafe.Pointer(l))
-	C.free(unsafe.Pointer(n))
+		if newLine {
+			nl = 1
+		}
+		l, n := C.CString(line), C.CString(next)
+		C.orbit_set_lyric(l, n, C.double(alpha), C.double(want.size), C.int(show), C.int(nl))
+		C.free(unsafe.Pointer(l))
+		C.free(unsafe.Pointer(n))
+	}
+	// ticks only as often as needed: ~12 a second switches lines on time; 2 when idle
+	rate := 2.0
+	if snap.Track != nil && snap.Playing && cfg.ShowLyrics {
+		rate = 12
+	}
+	if rate != macRate {
+		macRate = rate
+		C.orbit_set_rate(C.double(rate))
+	}
 }
 
-func macTextSize() float64 {
-	var s float64
-	withCfg(func() { s = float64(cfg.TextSize) })
-	return math.Max(18, math.Min(110, s*1.1))
+//export goMediaPing
+func goMediaPing() {
+	select {
+	case mediaPing <- struct{}{}:
+	default:
+	}
 }
 
-// macLyricFrame: the line to show now, the next one, and how visible it is (fades in, fades out
-// when the line is over or the music pauses).
-func macLyricFrame(snap MediaSnap, now time.Time) (string, string, float64) {
+func macTextSize() float64 { return math.Max(18, math.Min(110, float64(cfg.TextSize)*1.1)) } // (main thread: reads cfg directly)
+
+// macLyricFrame: the line to show, the next one, how visible (dimmed while paused), and whether
+// the line just changed (Cocoa fades it in on the GPU).
+func macLyricFrame(snap MediaSnap) (string, string, float64, bool) {
 	if snap.Track == nil {
 		macLine = -2
-		return "", "", 0
+		return "", "", 0, false
 	}
 	key, status, ls := lyrics.Get()
 	if key != snap.Track.Key || len(ls) == 0 || (status != lyrSynced && status != lyrPlain) {
-		return "", "", 0
+		return "", "", 0, false
 	}
-	p := snap.Pos + visualLead(cfg.LyricsStyle)
-	i := lineAt(ls, p)
-	if i != macLine {
-		macLine, macLineAt = i, now
-	}
-	if i < 0 || i >= len(ls) || strings.TrimSpace(ls[i].Text) == "" {
-		return "", "", 0
-	}
-	next := ""
-	if cfg.ShowPrevLine && i+1 < len(ls) {
-		next = ls[i+1].Text
-	}
-	a := math.Min(1, now.Sub(macLineAt).Seconds()/0.25)
-	if !snap.Playing {
-		a *= 0.55
-	}
-	return ls[i].Text, next, a
+	return lyricFrame(ls, snap.Pos+visualLead(cfg.LyricsStyle), snap.Playing, cfg.ShowPrevLine, &macLine)
 }
 
 func menuIconPath() string {

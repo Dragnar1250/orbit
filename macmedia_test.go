@@ -61,3 +61,44 @@ func FuzzParseMacNowPlaying(f *testing.F) {
 		}
 	})
 }
+
+func TestParseMacPlayers(t *testing.T) {
+	out := "spotify\tpaused\tSwim\tChase Atlantic\tPhases\t12.5\t240000\thttps://i.scdn.co/a\nmusic\tplaying\tÇıkmaz Sokak\tŞebnem\tX\t3.25\t200.5\t"
+	n, ok := parseMacPlayers(out)
+	if !ok || n.App != "music" || n.Pos != 3.25 {
+		t.Fatalf("the playing one: %+v", n)
+	}
+	if n, ok := parseMacPlayers("spotify\tstopped\nmusic\tstopped"); ok {
+		t.Fatalf("both stopped: %+v", n)
+	}
+	if _, ok := parseMacPlayers(""); ok {
+		t.Fatal("nothing open")
+	}
+	if n, ok := parseMacPlayers("spotify\tplaying\tSwim\tA\tB\t1\t200000\t\n"); !ok || n.Dur != 200 {
+		t.Fatalf("one player %+v", n)
+	}
+}
+
+func TestLyricFrame(t *testing.T) {
+	ls := prepare([]Line{{T: 1, Text: "one"}, {T: 3, Text: "two"}, {T: 5, Text: "  "}, {T: 7, Text: "four"}})
+	last := -2
+	l, n, a, ch := lyricFrame(ls, 1.5, true, true, &last)
+	if l != "one" || n != "two" || a != 1 || !ch {
+		t.Fatalf("first: %q %q %v %v", l, n, a, ch)
+	}
+	if _, _, _, ch := lyricFrame(ls, 2.0, true, true, &last); ch {
+		t.Fatal("same line reported as new")
+	}
+	if l, n, a, _ := lyricFrame(ls, 3.2, false, false, &last); l != "two" || n != "" || a != 0.55 {
+		t.Fatalf("paused, no next: %q %q %v", l, n, a)
+	}
+	if l, _, a, _ := lyricFrame(ls, 5.5, true, true, &last); l != "" || a != 0 {
+		t.Fatal("empty line hides")
+	}
+	if l, _, _, _ := lyricFrame(ls, 0.2, true, true, &last); l != "" {
+		t.Fatal("before the first line")
+	}
+	if l, n, _, _ := lyricFrame(ls, 99, true, true, &last); l != "four" || n != "" {
+		t.Fatal("last line")
+	}
+}
