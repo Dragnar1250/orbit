@@ -46,7 +46,7 @@ shot 05-settings-window
 # Apple Music is on every Mac: start it so Orbit has to talk to it (no song plays here)
 open -g -a Music 2>/dev/null; sleep 6; alive "Music running"
 shot 02-music-open
-osascript -e 'tell application "Music" to quit' 2>/dev/null; sleep 2; alive "Music closed"
+osascript -e 'tell application "Music" to quit' 2>/dev/null; sleep 2; killall Music 2>/dev/null; sleep 1; alive "Music closed"
 echo "memory: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
 # idle cost: CPU time used over 20 s of doing nothing
 cpu() { ps -o time= -p $PID | tr -d ' ' | awk -F: '{ if (NF==3) print $1*3600+$2*60+$3; else print $1*60+$2 }'; } # [h:]m:ss.hh
