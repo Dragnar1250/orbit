@@ -1,6 +1,6 @@
 #!/bin/bash
-# Builds Orbit.app for macOS (Apple Silicon + Intel in one) and zips it. Run on a Mac:
-#   VERSION=1.18.0 tools/mac/bundle.sh   → dist/Orbit.app, dist/Orbit-mac.zip
+# Builds Orbit.app for macOS (Apple Silicon + Intel in one), a zip and a disk image. Run on a Mac:
+#   VERSION=1.18.0 tools/mac/bundle.sh   → dist/Orbit.app, dist/Orbit-mac.zip, dist/Orbit-mac.dmg
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 VERSION=${VERSION:-$(grep -oE 'const appVersion = "[^"]+"' config.go | cut -d'"' -f2)}
@@ -40,4 +40,10 @@ PLIST
 codesign --force --deep --sign - "$APP"   # ad-hoc signature (no Apple developer account)
 codesign --verify --verbose=2 "$APP"
 (cd dist && ditto -c -k --keepParent Orbit.app Orbit-mac.zip)
+# a disk image too: it keeps the app intact even when it is passed around through Windows,
+# WhatsApp or Discord (a zip opened and zipped again on Windows loses what makes the app runnable)
+rm -rf dist/dmg dist/Orbit-mac.dmg && mkdir dist/dmg
+cp -R "$APP" dist/dmg/ && ln -s /Applications dist/dmg/Applications
+hdiutil create -volname "Orbit" -srcfolder dist/dmg -ov -format UDZO dist/Orbit-mac.dmg >/dev/null
+rm -rf dist/dmg
 echo "built $APP ($VERSION): $(lipo -archs "$APP/Contents/MacOS/Orbit")"
