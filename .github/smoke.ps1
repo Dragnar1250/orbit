@@ -25,11 +25,12 @@ function Shot($name) {
     $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
     $bmp.Save("shots\$name.png")
     # a small copy in the log too (artifacts aren't reachable from everywhere)
-    $w = 720; $h = [int]($b.Height * $w / $b.Width)
+    $w = 512; $h = [int]($b.Height * $w / $b.Width)
     $sm = New-Object System.Drawing.Bitmap $bmp, $w, $h
     $ms = New-Object System.IO.MemoryStream
     $sm.Save($ms, [System.Drawing.Imaging.ImageFormat]::Jpeg)
-    Write-Host ("SHOT {0} {1}" -f $name, [Convert]::ToBase64String($ms.ToArray()))
+    $b64 = [Convert]::ToBase64String($ms.ToArray())
+    for ($i = 0; $i -lt $b64.Length; $i += 3000) { Write-Host ("SHOT {0} {1:D3} {2}" -f $name, ($i / 3000), $b64.Substring($i, [Math]::Min(3000, $b64.Length - $i))) }
     $sm.Dispose(); $ms.Dispose(); $g.Dispose(); $bmp.Dispose()
   } catch { Write-Host "screenshot $name failed: $_" }
 }
