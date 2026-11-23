@@ -260,6 +260,29 @@ void os_set_rate(double hz) {
 	[[NSRunLoop mainRunLoop] addTimer:tickTimer forMode:NSRunLoopCommonModes];
 }
 
+// os_take_over: only one Orbit at a time — an Orbit already running (an older copy, another
+// place on disk, a login item) is asked to quit, and stopped if it doesn't within 3 s.
+int os_take_over(void) {
+	int closed = 0;
+	pid_t me = getpid();
+	NSString *bid = NSBundle.mainBundle.bundleIdentifier ?: @"com.dragnar1250.orbit";
+	NSMutableArray *others = [NSMutableArray array];
+	for (NSRunningApplication *a in [NSRunningApplication runningApplicationsWithBundleIdentifier:bid])
+		if (a.processIdentifier != me) [others addObject:a];
+	for (NSRunningApplication *a in NSWorkspace.sharedWorkspace.runningApplications) // copies started outside the app bundle
+		if (a.processIdentifier != me && [a.executableURL.lastPathComponent isEqualToString:@"Orbit"] &&
+			(!a.bundleIdentifier || [a.bundleIdentifier.lowercaseString containsString:@"orbit"]) && ![others containsObject:a]) [others addObject:a];
+	for (NSRunningApplication *a in others) { [a terminate]; closed++; }
+	for (int i = 0; i < 30 && others.count; i++) {
+		[NSThread sleepForTimeInterval:0.1];
+		NSMutableArray *left = [NSMutableArray array];
+		for (NSRunningApplication *a in others) if (!a.terminated) [left addObject:a];
+		others = left;
+	}
+	for (NSRunningApplication *a in others) [a forceTerminate];
+	return closed;
+}
+
 void os_run(const char *iconPath) {
 	@autoreleasepool {
 		[NSApplication sharedApplication];
@@ -305,7 +328,19 @@ void os_quit(void) { dispatch_async(dispatch_get_main_queue(), ^{ [NSApp termina
 
 // os_desktop_at: nothing from another app covers this point (pixels) — the widget under the
 // mouse can be hovered.
+static double lastAtT, lastAtX = -1e9, lastAtY = -1e9;
+static int lastAt;
+
 int os_desktop_at(double x, double y) {
+	// asking the window server is costly: the answer for the same spot is kept for 250 ms
+	double now = CFAbsoluteTimeGetCurrent();
+	if (fabs(x - lastAtX) < 3 && fabs(y - lastAtY) < 3 && now - lastAtT < 0.25) return lastAt;
+	lastAtX = x; lastAtY = y; lastAtT = now;
+	lastAt = os_desktop_at_now(x, y);
+	return lastAt;
+}
+
+int os_desktop_at_now(double x, double y) {
 	double s = os_scale();
 	CGPoint p = CGPointMake(x / s, y / s); // window bounds: points, y down from the main screen's top
 	CFArrayRef list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);

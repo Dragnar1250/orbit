@@ -23,3 +23,5 @@ int os_desktop_at(double x, double y);
 void os_open_settings(const char *url);
 int os_settings_open(void);
 double os_double_click_time(void);
+int os_take_over(void);
+int os_desktop_at_now(double x, double y);

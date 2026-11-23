@@ -239,6 +239,9 @@ func main() {
 		debug.SetCrashOutput(f, debug.CrashOptions{})
 		f.Close()
 	}
+	if n := C.os_take_over(); n > 0 {
+		logf("closed %d other Orbit(s) — only one runs at a time", int(n))
+	}
 	loadConfig()
 	media.SetOffset(cfg.OffsetSec)
 	icon := C.CString(menuIconPath())
@@ -281,8 +284,12 @@ func goStarted() {
 	clockView = newClockView()
 	weatherView = newWeatherView()
 	glowView = newGlowView()
-	go macMediaLoop()
-	go audioLoop()
+	if os.Getenv("ORBIT_FAKE_PLAY") != "" {
+		go fakePlay() // the build machine's test: a song "plays" without Spotify
+	} else {
+		go macMediaLoop()
+		go audioLoop()
+	}
 	go weatherLoop(func() (string, float64, float64, bool, bool) {
 		var place string
 		var lat, lon float64
@@ -361,6 +368,7 @@ func goTick() {
 	if fps <= 0 {
 		fps = 5
 	}
+	fps = min(fps, 30) // the Mac composites every widget itself: 30 is smooth and half the work
 	if hoverName != "" || drag != nil {
 		fps = max(fps, 30)
 	}
@@ -712,5 +720,24 @@ func logWidgets() {
 	if out != lastWidgetLog {
 		lastWidgetLog = out
 		logf("%s", out)
+	}
+}
+
+// fakePlay (tests only, ORBIT_FAKE_PLAY=1): a real song's title so its lyrics load, a moving
+// position, and a beat in the audio so the visualizer and the motion effects have music.
+func fakePlay() {
+	media.SetTrack("Swim", "Chase Atlantic", "Phases", "spotify")
+	media.SetDuration(keyOf("Swim", "Chase Atlantic"), 240)
+	media.SetPosition(20, true)
+	buf := make([]float32, 1440)
+	t := 0.0
+	for {
+		for i := range buf {
+			beat := math.Exp(-math.Mod(t, 0.5) * 9) // a kick twice a second
+			buf[i] = float32(0.6*beat*math.Sin(2*math.Pi*60*t) + 0.15*math.Sin(2*math.Pi*440*t) + 0.08*math.Sin(2*math.Pi*2500*t))
+			t += 1.0 / 48000
+		}
+		spectrum.Feed(buf, 48000)
+		time.Sleep(30 * time.Millisecond)
 	}
 }

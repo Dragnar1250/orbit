@@ -61,3 +61,31 @@ wait $PID; code=$?
 grep -qE "panic:|fatal error:|goroutine [0-9]+" "$DIR/crash.log" 2>/dev/null && fail "crash"
 echo "---- orbit.log ----"; cat "$DIR/orbit.log"
 echo "Orbit (macOS) went through everything without crashing"
+
+# ---- second run: a song "plays" (ORBIT_FAKE_PLAY) — visualizer, spinning record, lyrics, motion;
+# the cost while music plays; and only one Orbit at a time
+ORBIT_NO_SETTINGS=1 ORBIT_FAKE_PLAY=1 "$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout2.log 2>&1 &
+PID=$!
+sleep 8; alive "playing"
+TOK=$(cat "$DIR/settings.key")
+for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather; do set_opt $k true; done
+set_opt Motion 1; sleep 6; alive "playing with everything on"
+shot 06-playing
+for s in 0 1 2 3 4 5; do set_opt HaloStyle $s; sleep 1; alive "visualizer style $s while playing"; done
+shot 07-visualizer
+echo "memory while playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
+c0=$(cpu); sleep 20; c1=$(cpu)
+echo "CPU while playing: $(awk -v a=$c0 -v b=$c1 'BEGIN{printf "%.2f s in 20 s = %.2f%% of one core", b-a, (b-a)/20*100}')"
+echo "memory after 20 s playing: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
+grep -E "screen [0-9]+x" "$DIR/orbit.log" | tail -1
+# a second copy takes over and the first one leaves
+OLD=$PID
+ORBIT_NO_SETTINGS=1 ORBIT_FAKE_PLAY=1 "$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout3.log 2>&1 &
+PID=$!
+sleep 6
+kill -0 $OLD 2>/dev/null && fail "the older Orbit is still running next to the new one"
+alive "the new copy after taking over"
+echo "only one Orbit runs: $(pgrep -x Orbit | wc -l | tr -d ' ')"
+act quit true; sleep 3
+grep -E "closed [0-9]+ other" "$DIR/orbit.log" | tail -1
+echo "Orbit (macOS) played without crashing"
