@@ -147,3 +147,8 @@ func (w *Widget) setTop(b *Bitmap, ver int)                               {}
 func (w *Widget) gpuMotion(sx, sy, cx, cy, glow float64)                  {}
 func (w *Widget) rings(r, wd, a []float64, c uint32, cx, cy float64) bool { return false }
 func (w *Widget) spin(b *Bitmap, ver int, cx, cy, deg float64)            {}
+
+// spriteRuns: the runs the GPU can't place as pictures (Windows: all of them)
+func (w *Widget) spriteRuns(runs []run, ox, oy float32, F float64, fxFor func(run) int) []run {
+	return runs
+}

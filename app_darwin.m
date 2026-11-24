@@ -150,12 +150,12 @@ void os_present_free(void **state) {
 // drawn at a quarter of the pixels and stretched by the GPU), a still picture (the record without
 // its label), the turning label (turned by the GPU), rings of light (the record's groove light,
 // drawn by the GPU), the main picture and a still picture on top (the record's shine and arm).
-enum { LSoft, LBase, LSpin, LRings, LMain, LTop, LCount };
+enum { LSoft, LBase, LSpin, LRings, LMain, LTop, LGlowS, LTextS, LCount };
 
 static CALayer *newLayer(void) {
 	CALayer *l = [CALayer layer];
 	NSNull *no = NSNull.null;
-	l.actions = @{@"contents": no, @"bounds": no, @"position": no, @"transform": no, @"hidden": no, @"opacity": no, @"frame": no, @"contentsScale": no};
+	l.actions = @{@"contents": no, @"bounds": no, @"position": no, @"transform": no, @"hidden": no, @"opacity": no, @"frame": no, @"contentsScale": no, @"anchorPoint": no, @"sublayers": no};
 	l.contentsGravity = kCAGravityResize;
 	l.anchorPoint = CGPointMake(0.5, 0.5);
 	return l;
@@ -653,6 +653,7 @@ void ow_motion(void *wp, double sx, double sy, double cx, double cy, double glow
 	t = CATransform3DTranslate(t, -px, -py, 0);
 	root.sublayerTransform = t;
 	if (v->layers[LSoft]) v->layers[LSoft].opacity = glow;
+	if (v->layers[LGlowS]) v->layers[LGlowS].opacity = glow;
 }
 
 // ow_rings: n circles of light around (cx, cy) pixels — radius r, width w, opacity a — in colour c:
@@ -691,4 +692,38 @@ void ow_rings(void *wp, int n, const double *r, const double *w, const double *a
 		sl.strokeColor = col;
 	}
 	CGColorRelease(col);
+}
+
+void os_cgimage_release(void *img) { if (img) CGImageRelease((CGImageRef)img); }
+
+// ow_sprites: n pictures (the lyrics' words) placed, turned, scaled and faded by the GPU — each
+// with its glow picture right under it (all the glows together in one layer under all the words)
+void ow_sprites(void *wp, int n, const OSprite *sp) {
+	OrbitWidgetView *v = (OrbitWidgetView *)((__bridge NSWindow *)wp).contentView;
+	if (n <= 0 && !v->layers[LTextS]) return;
+	double s = os_scale();
+	CALayer *boxes[2] = {[v part:LGlowS], [v part:LTextS]};
+	CGRect b = v.layer.bounds;
+	double H = b.size.height;
+	for (int k = 0; k < 2; k++) {
+		CALayer *box = boxes[k];
+		box.hidden = n <= 0;
+		if (!CGRectEqualToRect(box.frame, b)) box.frame = b;
+		while ((int)box.sublayers.count < n) [box addSublayer:newLayer()];
+		NSArray *subs = box.sublayers;
+		for (int i = 0; i < (int)subs.count; i++) {
+			CALayer *l = subs[i];
+			void *img = i < n ? (k ? sp[i].img : sp[i].glow) : NULL;
+			if (!img) { if (!l.hidden) l.hidden = YES; continue; }
+			const OSprite *d = &sp[i];
+			l.hidden = NO;
+			if (l.contents != (__bridge id)img) l.contents = (__bridge id)img;
+			l.bounds = CGRectMake(0, 0, d->w / s, d->h / s);
+			l.anchorPoint = CGPointMake(d->ax, 1 - d->ay); // (y up)
+			l.position = CGPointMake(d->x / s, H - d->y / s);
+			CATransform3D t = CATransform3DMakeRotation(-d->rot * M_PI / 180, 0, 0, 1);
+			l.transform = CATransform3DScale(t, d->sx, d->sy, 1);
+			l.opacity = d->alpha;
+		}
+	}
 }

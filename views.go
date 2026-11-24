@@ -2845,7 +2845,6 @@ func (lv *LyricsView) render(runs []run, bw, bh float32, F float64, style int) {
 		return
 	}
 	g := lv.w.g()
-	gClear(g, 0)
 	ox := pad + bw/2
 	oy := pad
 	if editMode {
@@ -2871,7 +2870,7 @@ func (lv *LyricsView) render(runs []run, bw, bh float32, F float64, style int) {
 		}
 		gBase(g)
 	}
-	for _, r := range runs {
+	fxFor := func(r run) int {
 		fx := effect
 		if r.f != nil && r.f.size < float32(F)*0.6 && fx == fxStrongGlow {
 			fx = fxSoftGlow // keep the small lines readable
@@ -2879,7 +2878,23 @@ func (lv *LyricsView) render(runs []run, bw, bh float32, F float64, style int) {
 		if r.bg != 0 && (fx == fxSoftGlow || fx == fxStrongGlow || fx == fxNeon || fx == fxSoftBlur || fx == fxGlass || fx == fxGradient) {
 			fx = fxNone // dark text on the marker stays crisp
 		}
-		drawRun(g, r, ox, oy, F, fx)
+		return fx
+	}
+	if lv.w.gpuLayers() && !editMode && !lyrBase.on {
+		// the Mac: each word is drawn once into a picture of its own, and the GPU places, turns,
+		// scales and fades them every frame — only what can't be done that way is drawn here
+		runs = lv.w.spriteRuns(runs, ox, oy, F, fxFor)
+	} else if lv.w.gpuLayers() {
+		lv.w.spriteRuns(nil, ox, oy, F, fxFor) // (no pictures now)
+	}
+	if len(runs) > 0 || editMode || !lv.w.gpuLayers() {
+		gClear(g, 0)
+		gBase(g)
+	} else {
+		softClear(g) // (everything is a picture of its own: the canvas isn't shown)
+	}
+	for _, r := range runs {
+		drawRun(g, r, ox, oy, F, fxFor(r))
 	}
 	lyrBase.on = false
 	gReset(g)
