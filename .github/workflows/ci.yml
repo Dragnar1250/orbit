@@ -82,7 +82,7 @@ jobs:
         run: tools/mac/smoke.sh
       - name: The disk image opens and holds a working, signed app
         run: |
-          hdiutil attach -nobrowse -readonly dist/Orbit-mac.dmg -mountpoint /tmp/orbitdmg
+          for i in 1 2 3 4 5; do hdiutil attach -nobrowse -readonly dist/Orbit-mac.dmg -mountpoint /tmp/orbitdmg && break; sleep 5; done # (the runner is sometimes busy)
           test -x /tmp/orbitdmg/Orbit.app/Contents/MacOS/Orbit
           codesign --verify --deep --strict /tmp/orbitdmg/Orbit.app
           ls -la /tmp/orbitdmg
