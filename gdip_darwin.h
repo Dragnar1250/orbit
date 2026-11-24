@@ -68,3 +68,4 @@ OG *og_new_surface(int w, int h);
 void *og_surface_show(OG *g);
 void og_surface_next(OG *g);
 void og_live(long *out);
+void *og_cgimage_crop(OG *g, int *r);

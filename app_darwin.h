@@ -37,7 +37,7 @@ void ow_spin(void *w, OG *g, int ver, double cx, double cy, double deg);
 void ow_motion(void *w, double sx, double sy, double cx, double cy, double glow);
 void os_show_split(double *out);
 void ow_rings(void *w, int n, const double *r, const double *wd, const double *a, uint32_t c, double cx, double cy);
-typedef struct { void *img, *glow; double x, y, ax, ay, w, h, rot, sx, sy, alpha; } OSprite;
+typedef struct { void *img, *glow; double x, y, iw, ih, iax, iay, gw, gh, gax, gay, rot, sx, sy, alpha; } OSprite;
 void ow_sprites(void *w, int n, const OSprite *sp);
 void os_cgimage_release(void *img);
 double os_tick_hz(void);

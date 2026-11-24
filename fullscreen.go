@@ -147,13 +147,15 @@ func (f *FullView) measure(d time.Duration, now time.Time) {
 	f.perfAt = now
 	budget := 1000 / float64(max(30, cfg.FsFPS)) * 0.85
 	logf("full screen %dx%d drawn at %dx%d: %.1f ms a frame", f.winW, f.winH, f.W, f.H, f.frameMs)
-	minQ := 0.75
+	minQ, slow, runs := 0.75, budget*1.6, 3
 	if gpuUpscale {
-		minQ = 0.5 // the GPU stretches it smoothly (on a Retina screen: still one pixel per point)
+		// the GPU stretches it smoothly (on a Retina screen: still one pixel per point), so it
+		// steps down as soon as frames come close to late — smooth first, sharp second
+		minQ, slow, runs = 0.5, budget, 2
 	}
-	if f.frameMs > budget*1.6 && f.q > minQ {
+	if f.frameMs > slow && f.q > minQ {
 		f.slowRuns++
-		if f.slowRuns >= 3 {
+		if f.slowRuns >= runs {
 			f.slowRuns = 0
 			nq := math.Max(minQ, f.q-0.125)
 			logf("full screen: too slow here, drawing at %.0f%% from now on", nq*100)

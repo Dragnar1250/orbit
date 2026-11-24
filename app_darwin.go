@@ -1021,6 +1021,7 @@ type perfStats struct {
 	last    time.Time
 	from    time.Time
 	spent   [7]time.Duration
+	now     [7]time.Duration // this frame
 	every   time.Duration
 	started bool
 }
@@ -1055,11 +1056,22 @@ func (p *perfStats) work(d time.Duration) {
 	if d > p.maxWork {
 		p.maxWork = d
 	}
+	if d > 80*time.Millisecond && p.started { // a frame that stalled: say where it went
+		out := fmt.Sprintf("slow frame: %.0f ms —", float64(d.Microseconds())/1000)
+		for i, x := range p.now {
+			if x > time.Millisecond {
+				out += fmt.Sprintf(" %s %.0f ms", perfNames[i], float64(x.Microseconds())/1000)
+			}
+		}
+		logf("%s", out)
+	}
+	p.now = [7]time.Duration{}
 }
 
 func (p *perfStats) add(i int, from time.Time) time.Time {
 	n := time.Now()
 	p.spent[i] += n.Sub(from)
+	p.now[i] += n.Sub(from)
 	return n
 }
 
@@ -1085,7 +1097,7 @@ func (p *perfStats) report(now time.Time, playing bool) {
 		var ms runtime.MemStats
 		runtime.ReadMemStats(&ms)
 		mb := func(b C.long) float64 { return float64(b) / (1 << 20) }
-		out += fmt.Sprintf(" a frame · memory: Go %.0f MB, %d canvases %.0f MB, surfaces %.0f+%.0f MB, %d pictures %.0f MB, %d words", float64(ms.HeapInuse)/(1<<20), lv[0], mb(lv[1]), mb(lv[2]), mb(C.os_present_bytes()), lv[3], mb(lv[4]), len(sprites))
+		out += fmt.Sprintf(" a frame · memory: Go %.0f MB, %d canvases %.0f MB, surfaces %.0f+%.0f MB, %d pictures %.0f MB, %d words %.0f MB", float64(ms.HeapInuse)/(1<<20), lv[0], mb(lv[1]), mb(lv[2]), mb(C.os_present_bytes()), lv[3], mb(lv[4]), len(sprites), float64(spriteBytes)/(1<<20))
 		logf("%s", out)
 	} else {
 		var secs C.double

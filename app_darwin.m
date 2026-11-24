@@ -707,8 +707,9 @@ void ow_sprites(void *wp, int n, const OSprite *sp) {
 			const OSprite *d = &sp[i];
 			l.hidden = NO;
 			if (l.contents != (__bridge id)img) l.contents = (__bridge id)img;
-			l.bounds = CGRectMake(0, 0, d->w / s, d->h / s);
-			l.anchorPoint = CGPointMake(d->ax, 1 - d->ay); // (y up)
+			double w = k ? d->iw : d->gw, h = k ? d->ih : d->gh, ax = k ? d->iax : d->gax, ay = k ? d->iay : d->gay;
+			l.bounds = CGRectMake(0, 0, w / s, h / s);
+			l.anchorPoint = CGPointMake(ax, 1 - ay); // (the turning point, in the picture; y up)
 			l.position = CGPointMake(d->x / s, H - d->y / s);
 			CATransform3D t = CATransform3DMakeRotation(-d->rot * M_PI / 180, 0, 0, 1);
 			l.transform = CATransform3DScale(t, d->sx, d->sy, 1);

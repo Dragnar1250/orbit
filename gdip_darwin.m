@@ -700,3 +700,30 @@ void og_blend(OG *dst, OG *src, float x, float y, float alpha) {
 	CGImageRelease(img);
 	og_apply(dst); // the clip and transform as they were
 }
+
+// og_cgimage_crop: the part of canvas g that has anything on it, as a picture of its own (+1);
+// r gets where it was (x, y, w, h). NULL if the canvas is empty. (A lyric's word picture keeps
+// only its letters, not the room its glow needed while it was drawn.)
+void *og_cgimage_crop(OG *g, int *r) {
+	size_t row = g->stride ? g->stride : (size_t)g->w * 4;
+	const uint8_t *b = g->bits;
+	int x0 = g->w, y0 = g->h, x1 = -1, y1 = -1;
+	for (int y = 0; y < g->h; y++) {
+		const uint8_t *p = b + y * row + 3;
+		int any = 0;
+		for (int x = 0; x < g->w; x++, p += 4)
+			if (*p > 2) { if (x < x0) x0 = x; if (x > x1) x1 = x; any = 1; }
+		if (any) { if (y < y0) y0 = y; y1 = y; }
+	}
+	if (x1 < 0) return NULL;
+	int w = x1 - x0 + 1, h = y1 - y0 + 1;
+	CGContextRef c = CGBitmapContextCreate(NULL, w, h, 8, (size_t)w * 4, rgb(), kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+	if (!c) return NULL;
+	uint8_t *d = CGBitmapContextGetData(c);
+	size_t drow = CGBitmapContextGetBytesPerRow(c);
+	for (int y = 0; y < h; y++) memcpy(d + y * drow, b + (y0 + y) * row + x0 * 4, (size_t)w * 4);
+	CGImageRef img = CGBitmapContextCreateImage(c);
+	CGContextRelease(c);
+	r[0] = x0; r[1] = y0; r[2] = w; r[3] = h;
+	return (void *)img;
+}

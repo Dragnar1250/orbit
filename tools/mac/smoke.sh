@@ -195,6 +195,7 @@ alive "fast switching"
 for i in 1 2 3 4 5 6; do act fullscreen true; sleep 0.7; act fullscreen false; sleep 0.4; done
 alive "full screen in and out"
 echo "memory after all of it: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
+grep "slow frame" "$DIR/orbit.log" | tail -20
 if [ -n "$SLOW" ]; then echo "NOT SMOOTH:$SLOW"; else echo "every look ran smoothly"; fi
 act quit true; sleep 3
 grep -E "closed [0-9]+ other" "$DIR/orbit.log" | tail -1
