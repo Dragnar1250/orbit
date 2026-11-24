@@ -84,6 +84,7 @@ static IOSurfaceRef newSurface(int w, int h) {
 
 static int presentCount;
 static double presentSecs;
+double showSplit[4]; // (perf) unlock, contents, window, total — seconds since the last report
 
 int os_present_stats(double *secs) { int n = presentCount; *secs = presentSecs; presentCount = 0; presentSecs = 0; return n; }
 
@@ -222,25 +223,37 @@ void ow_show(void *wp, OG *g, double x, double y, double w, double h, double alp
 	double s = os_scale();
 	NSRect fr = NSMakeRect(x / s, mainTop() - (y + h) / s, w / s, h / s);
 	OrbitWidgetView *v = (OrbitWidgetView *)win.contentView;
+	double tw = CACurrentMediaTime();
 	if (!NSEqualRects(v->asked, fr)) { v->asked = fr; [win setFrame:fr display:NO]; }
 	// no explicit transaction: each would be its own trip to the window server; the run loop
 	// sends every widget's change together after the frame
 	CGRect b = CGRectMake(0, 0, w / s, h / s);
 	for (int i = 0; i < LCount; i++)
 		if (v->layers[i] && i != LSpin && !CGRectEqualToRect(v->layers[i].frame, b)) v->layers[i].frame = b;
+	double t0 = CACurrentMediaTime(), t1 = t0, t2 = t0;
 	if (g) {
 		CALayer *m = [v part:LMain];
-		m.hidden = NO;
+		if (m.hidden) m.hidden = NO;
 		IOSurfaceRef sf = og_surface_show(g);
+		t1 = CACurrentMediaTime();
 		if (sf) { // drawn straight into the surface: just show it
 			if (m.contents != (__bridge id)sf) m.contents = (__bridge id)sf;
 			if (m.contentsScale != s) m.contentsScale = s;
 			presentCount++;
 		} else os_present_layer((__bridge void *)m, &v->surfaces[LMain], g, s);
+		t2 = CACurrentMediaTime();
 	} else [v drop:LMain]; // (all of it is on the soft layer)
+	showSplit[0] += t1 - t0;
+	showSplit[1] += t2 - t1;
+	showSplit[2] += t0 - tw;
 	if (v->alpha != alpha + 1) { v->alpha = alpha + 1; win.alphaValue = alpha; } // (+1: 0 is "not set yet")
 	if (!win.isVisible) [win orderFrontRegardless];
+	double t3 = CACurrentMediaTime();
+	showSplit[2] += t3 - t2;
+	showSplit[3] += t3 - tw;
 }
+
+void os_show_split(double *out) { for (int i = 0; i < 4; i++) { out[i] = showSplit[i]; showSplit[i] = 0; } }
 
 // ow_layer: picture g (k times the window's pixels) as layer i; NULL: none
 void ow_layer(void *wp, int i, OG *g, double k) {

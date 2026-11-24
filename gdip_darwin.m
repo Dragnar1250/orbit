@@ -112,7 +112,7 @@ static int og_bind(OG *g, int i) {
 		CGContextSaveGState(g->sctx[i]);
 		if (i >= g->nsurf) g->nsurf = i + 1;
 	}
-	IOSurfaceLock(g->surf[i], 0, NULL);
+	IOSurfaceLock(g->surf[i], kIOSurfaceLockAvoidSync, NULL); // (only surfaces nobody reads are drawn on)
 	g->locked = 1;
 	g->cur = i;
 	g->ctx = g->sctx[i];

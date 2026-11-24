@@ -960,6 +960,9 @@ func (p *perfStats) report(now time.Time, playing bool) {
 		var secs C.double
 		n := int(C.os_present_stats(&secs))
 		out := fmt.Sprintf("perf: %.1f fps (screen %.0f Hz), slowest gap %.0f ms, shown %d pictures (%.2f ms each);", float64(p.frames)/el.Seconds(), float64(C.os_refresh_rate()), float64(p.maxGap.Microseconds())/1000, n, float64(secs)*1000/float64(max(n, 1)))
+		var sp [4]C.double
+		C.os_show_split(&sp[0])
+		out += fmt.Sprintf(" [showing: unlock %.2f, contents %.2f, window %.2f, all %.2f ms a frame]", float64(sp[0])*1000/float64(p.frames), float64(sp[1])*1000/float64(p.frames), float64(sp[2])*1000/float64(p.frames), float64(sp[3])*1000/float64(p.frames))
 		for i, d := range p.spent {
 			if d > 0 {
 				out += fmt.Sprintf(" %s %.2f ms", perfNames[i], float64(d.Microseconds())/1000/float64(p.frames))
