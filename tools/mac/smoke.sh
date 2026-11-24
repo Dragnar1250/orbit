@@ -113,7 +113,7 @@ grep -E "screen [0-9]+x" "$DIR/orbit.log" | tail -1
 # a second copy takes over and the first one leaves — this one draws as many pixels as a Retina
 # screen (ORBIT_SCALE=2), to see what a MacBook pays
 OLD=$PID
-ORBIT_SCALE=2 ORBIT_PERF=1 ORBIT_NO_SETTINGS=1 ORBIT_FAKE_PLAY=1 "$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout3.log 2>&1 &
+ORBIT_SCALE=2 ORBIT_PERF=2 ORBIT_NO_SETTINGS=1 ORBIT_FAKE_PLAY=1 "$APP/Contents/MacOS/Orbit" > /tmp/orbit-stdout3.log 2>&1 &
 PID=$!
 sleep 6
 kill -0 $OLD 2>/dev/null && fail "the older Orbit is still running next to the new one"
@@ -137,6 +137,63 @@ grep "full screen" "$DIR/orbit.log" | tail -3
 pprof_top /tmp/orbit-cpu-2.prof fullscreen
 act fullscreen false; sleep 1
 shot 11-retina
+
+# every look, one after another, at Retina size and 60 fps: frames per second when settled, late
+# frames, and the longest frame (switching looks rebuilds pictures). Reports every 2 s.
+SLOW=""
+scen() {
+  name=$1; shift
+  before=$(grep -c "perf:" "$DIR/orbit.log")
+  for kv in "$@"; do set_opt "${kv%%=*}" "${kv#*=}"; done
+  sleep 5
+  alive "$name"
+  lines=$(grep "perf:" "$DIR/orbit.log" | tail -n +$((before + 1)))
+  last=$(echo "$lines" | tail -1)
+  fps=$(echo "$last" | grep -oE '[0-9.]+ fps' | cut -d' ' -f1)
+  late=$(echo "$last" | grep -oE '[0-9]+ late frames' | cut -d' ' -f1)
+  long=$(echo "$last" | grep -oE 'longest frame [0-9.]+' | awk '{print $3}')
+  sw=$(echo "$lines" | grep -oE 'longest frame [0-9.]+' | awk '{print $3}' | sort -n | tail -1)
+  echo "SCEN $(printf '%-28s' "$name") ${fps:-?} fps, ${late:-?} late, longest ${long:-?} ms (switching: ${sw:-?} ms)"
+  awk -v f="${fps:-0}" -v l="${late:-99}" -v t="$FPSWANT" 'BEGIN{exit !(f < t*0.95 || l > 3)}' && SLOW="$SLOW
+  $name: ${fps:-?} fps, ${late:-?} late"
+}
+FPSWANT=60
+for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather; do set_opt $k true; done
+set_opt FPS 60; set_opt Motion 3; set_opt Effect 1
+for st in $(seq 0 28); do scen "lyrics style $st" LyricsStyle=$st; done
+set_opt LyricsStyle 3
+for e in $(seq 0 11); do scen "effect $e" Effect=$e; done
+set_opt Effect 1
+for m in 0 1 2 3 4; do scen "motion $m" Motion=$m; done
+set_opt Motion 3
+for d in 0 1 2 3 4 5 6; do scen "record $d" DiscStyle=$d; done
+scen "record, no ambient light" AmbVinyl=false
+set_opt AmbVinyl true
+for h in 0 1 2 3 4 5; do scen "visualizer $h" HaloStyle=$h; done
+for c in 0 1 2 3 4; do scen "clock $c" ClockStyle=$c; done
+set_opt ShowGlow true
+for gl in $(seq 0 9); do scen "screen glow $gl" GlowStyle=$gl; done
+set_opt ShowGlow false
+scen "text size big" TextSize=90
+scen "text size small" TextSize=40
+FPSWANT=30
+set_opt FsKind 0; set_opt FsFPS 30; act fullscreen true; sleep 2
+for m in 0 1 2 3; do for b in 0 1 2 3 4 5 6; do scen "full screen $m/$b" FsMode=$m FsBg=$b; done; done
+set_opt FsFPS 60; FPSWANT=60
+scen "full screen 60 fps" FsMode=3 FsBg=1
+act fullscreen false; sleep 1
+FPSWANT=30
+set_opt FsKind 1; act fullscreen true; sleep 2
+for b in 0 1 2 3 4; do scen "desktop skin $b" SkinBg=$b; done
+act fullscreen false; sleep 1
+FPSWANT=60
+# quick switching back and forth must not crash or leak
+for i in $(seq 1 40); do set_opt LyricsStyle $((i % 29)); set_opt DiscStyle $((i % 7)); set_opt HaloStyle $((i % 6)); sleep 0.15; done
+alive "fast switching"
+for i in 1 2 3 4 5 6; do act fullscreen true; sleep 0.7; act fullscreen false; sleep 0.4; done
+alive "full screen in and out"
+echo "memory after all of it: $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}')"
+if [ -n "$SLOW" ]; then echo "NOT SMOOTH:$SLOW"; else echo "every look ran smoothly"; fi
 act quit true; sleep 3
 grep -E "closed [0-9]+ other" "$DIR/orbit.log" | tail -1
 echo "Orbit (macOS) played without crashing"

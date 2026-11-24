@@ -489,6 +489,7 @@ static void linkStop(void) {
 }
 
 double os_refresh_rate(void) { return linkRefresh; }
+double os_tick_hz(void) { return tickHz; }
 
 void os_set_rate(double hz) {
 	if (hz < 1) hz = 1;
@@ -577,37 +578,26 @@ void os_run(const char *iconPath) {
 void os_set_tooltip(const char *s) { statusItem.button.toolTip = [NSString stringWithUTF8String:s]; }
 void os_quit(void) { dispatch_async(dispatch_get_main_queue(), ^{ [NSApp terminate:nil]; }); }
 
-// os_desktop_at: nothing from another app covers this point (pixels) — the widget under the
-// mouse can be hovered.
-static double lastAtT, lastAtX = -1e9, lastAtY = -1e9;
-static int lastAt;
-
-int os_desktop_at(double x, double y) {
-	// asking the window server is costly: the answer for the same spot is kept for 250 ms
-	double now = CFAbsoluteTimeGetCurrent();
-	if (fabs(x - lastAtX) < 3 && fabs(y - lastAtY) < 3 && now - lastAtT < 0.25) return lastAt;
-	lastAtX = x; lastAtY = y; lastAtT = now;
-	lastAt = os_desktop_at_now(x, y);
-	return lastAt;
-}
-
-int os_desktop_at_now(double x, double y) {
-	double s = os_scale();
-	CGPoint p = CGPointMake(x / s, y / s); // window bounds: points, y down from the main screen's top
+// os_other_windows: where other apps' normal windows are (pixels, front to back). Asked on a
+// background thread (the window server can take milliseconds to answer); s = screen scale.
+int os_other_windows(double s, double *out, int max) {
 	CFArrayRef list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
-	if (!list) return 1;
-	int me = getpid(), free_ = 1;
-	for (CFIndex i = 0; i < CFArrayGetCount(list); i++) {
+	if (!list) return -1;
+	int me = getpid(), n = 0;
+	for (CFIndex i = 0; i < CFArrayGetCount(list) && n < max; i++) {
 		NSDictionary *w = (__bridge NSDictionary *)CFArrayGetValueAtIndex(list, i);
 		if ([w[(id)kCGWindowOwnerPID] intValue] == me) continue;
-		int layer = [w[(id)kCGWindowLayer] intValue];
-		if (layer != 0) continue; // menu bar, Dock, overlays
+		if ([w[(id)kCGWindowLayer] intValue] != 0) continue; // menu bar, Dock, overlays
 		CGRect r;
 		if (!CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)w[(id)kCGWindowBounds], &r)) continue;
-		if (CGRectContainsPoint(r, p)) { free_ = 0; break; }
+		out[4 * n] = r.origin.x * s;
+		out[4 * n + 1] = r.origin.y * s;
+		out[4 * n + 2] = r.size.width * s;
+		out[4 * n + 3] = r.size.height * s;
+		n++;
 	}
 	CFRelease(list);
-	return free_;
+	return n;
 }
 
 double os_double_click_time(void) { return NSEvent.doubleClickInterval; }
@@ -616,11 +606,9 @@ void os_show_menu(void) { [menu popUpMenuPositioningItem:nil atLocation:NSEvent.
 
 // os_desktop_widgets: where the Mac's desktop widgets are (pixels). They are windows of the
 // Notification Center (WidgetKit) under the normal windows; full-screen ones are not widgets.
-int os_desktop_widgets(double *out, int max) {
+int os_desktop_widgets(double s, double scrW, double scrH, double *out, int max) {
 	CFArrayRef list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
 	if (!list) return 0;
-	double s = os_scale();
-	NSRect scr = mainScreen().frame;
 	int n = 0;
 	for (CFIndex i = 0; i < CFArrayGetCount(list) && n < max; i++) {
 		NSDictionary *w = (__bridge NSDictionary *)CFArrayGetValueAtIndex(list, i);
@@ -629,7 +617,7 @@ int os_desktop_widgets(double *out, int max) {
 		if ([w[(id)kCGWindowLayer] intValue] >= 0) continue; // banners and the side panel are above the windows
 		CGRect r;
 		if (!CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)w[(id)kCGWindowBounds], &r)) continue;
-		if (r.size.width < 40 || r.size.height < 40 || r.size.width * r.size.height > 0.4 * scr.size.width * scr.size.height) continue;
+		if (r.size.width < 40 || r.size.height < 40 || r.size.width * r.size.height > 0.4 * scrW * scrH) continue;
 		out[4 * n] = r.origin.x * s;
 		out[4 * n + 1] = r.origin.y * s;
 		out[4 * n + 2] = r.size.width * s;

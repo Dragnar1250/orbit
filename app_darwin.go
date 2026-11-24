@@ -24,7 +24,9 @@ import (
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
+	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -362,7 +364,73 @@ func cursorPos() POINT {
 	return POINT{int32(x), int32(y)}
 }
 
-func desktopAt(pt POINT) bool { return C.os_desktop_at(C.double(pt.X), C.double(pt.Y)) != 0 }
+// desktopAt: no other app's window covers pt — the widget under the mouse can be hovered. The
+// windows are listed on a background thread (it can take the window server milliseconds), at
+// most every 200 ms and only while asked: the answer here never waits.
+func desktopAt(pt POINT) bool {
+	winList.Lock()
+	defer winList.Unlock()
+	winList.wanted = time.Now()
+	if !winList.running {
+		winList.running = true
+		go windowWatcher(float64(C.os_scale()))
+	}
+	for _, r := range winList.others {
+		if pt.X >= r.Left && pt.X < r.Right && pt.Y >= r.Top && pt.Y < r.Bottom {
+			return false
+		}
+	}
+	return true
+}
+
+var winList struct {
+	sync.Mutex
+	others, widgets []RECT
+	wanted          time.Time
+	running         bool
+	scrW, scrH      float64
+}
+
+// windowWatcher lists the other windows while someone is asking (stops after 2 s of quiet), and
+// the Mac's desktop widgets every 5 s
+func windowWatcher(scale float64) {
+	var buf [4 * 128]C.double
+	var deskAt time.Time
+	for {
+		winList.Lock()
+		idle := time.Since(winList.wanted) > 2*time.Second
+		w, h := winList.scrW, winList.scrH
+		if idle {
+			winList.running = false
+		}
+		winList.Unlock()
+		if idle {
+			return
+		}
+		var rs []RECT
+		if n := int(C.os_other_windows(C.double(scale), &buf[0], 128)); n >= 0 {
+			for i := 0; i < n; i++ {
+				rs = append(rs, RECT{int32(buf[4*i]), int32(buf[4*i+1]), int32(buf[4*i] + buf[4*i+2]), int32(buf[4*i+1] + buf[4*i+3])})
+			}
+		}
+		var ds []RECT
+		desk := time.Since(deskAt) > 5*time.Second && w > 0
+		if desk {
+			deskAt = time.Now()
+			n := int(C.os_desktop_widgets(C.double(scale), C.double(w), C.double(h), &buf[0], 64))
+			for i := 0; i < n; i++ {
+				ds = append(ds, RECT{int32(buf[4*i]), int32(buf[4*i+1]), int32(buf[4*i] + buf[4*i+2]), int32(buf[4*i+1] + buf[4*i+3])})
+			}
+		}
+		winList.Lock()
+		winList.others = rs
+		if desk {
+			winList.widgets = ds
+		}
+		winList.Unlock()
+		time.Sleep(200 * time.Millisecond)
+	}
+}
 
 var lastClick struct {
 	t    time.Time
@@ -480,6 +548,8 @@ func goTick() {
 			logf("PANIC while drawing: %v\n%s", r, debug.Stack())
 		}
 	}()
+	workFrom := time.Now()
+	defer func() { perf.work(time.Since(workFrom)) }()
 	drainUI()
 	trimCaches()
 	now := time.Now()
@@ -931,6 +1001,8 @@ func fakePlay() {
 // ORBIT_PERF=1). Frames per second as they really came, the slowest gap, and each widget's share.
 type perfStats struct {
 	frames  int
+	hitches int           // frames that came late (more than 1.5 frame times after the last)
+	maxWork time.Duration // the longest a frame took to draw
 	maxGap  time.Duration
 	last    time.Time
 	from    time.Time
@@ -945,17 +1017,30 @@ var perfNames = [7]string{"turntable", "visualizer", "lyrics", "clock", "weather
 func (p *perfStats) tick(now time.Time) {
 	if !p.started {
 		p.started, p.from, p.every = true, now, time.Minute
-		if os.Getenv("ORBIT_PERF") != "" {
+		if v := os.Getenv("ORBIT_PERF"); v != "" {
 			p.every = 5 * time.Second
+			if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 60 {
+				p.every = time.Duration(n) * time.Second
+			}
 		}
 	}
 	if !p.last.IsZero() {
-		if gap := now.Sub(p.last); gap > p.maxGap && gap < time.Second {
+		gap := now.Sub(p.last)
+		if gap > p.maxGap && gap < time.Second {
 			p.maxGap = gap
+		}
+		if hz := float64(C.os_tick_hz()); hz >= 20 && gap.Seconds() > 1.5/hz && gap < time.Second {
+			p.hitches++
 		}
 	}
 	p.last = now
 	p.frames++
+}
+
+func (p *perfStats) work(d time.Duration) {
+	if d > p.maxWork {
+		p.maxWork = d
+	}
 }
 
 func (p *perfStats) add(i int, from time.Time) time.Time {
@@ -972,7 +1057,7 @@ func (p *perfStats) report(now time.Time, playing bool) {
 	if playing && p.frames > 0 {
 		var secs C.double
 		n := int(C.os_present_stats(&secs))
-		out := fmt.Sprintf("perf: %.1f fps (screen %.0f Hz), slowest gap %.0f ms, shown %d pictures (%.2f ms each);", float64(p.frames)/el.Seconds(), float64(C.os_refresh_rate()), float64(p.maxGap.Microseconds())/1000, n, float64(secs)*1000/float64(max(n, 1)))
+		out := fmt.Sprintf("perf: %.1f fps (screen %.0f Hz), %d late frames, longest frame %.1f ms, slowest gap %.0f ms, shown %d pictures (%.2f ms each);", float64(p.frames)/el.Seconds(), float64(C.os_refresh_rate()), p.hitches, float64(p.maxWork.Microseconds())/1000, float64(p.maxGap.Microseconds())/1000, n, float64(secs)*1000/float64(max(n, 1)))
 		var sp [4]C.double
 		C.os_show_split(&sp[0])
 		out += fmt.Sprintf(" [showing: unlock %.2f, contents %.2f, window %.2f, all %.2f ms a frame]", float64(sp[0])*1000/float64(p.frames), float64(sp[1])*1000/float64(p.frames), float64(sp[2])*1000/float64(p.frames), float64(sp[3])*1000/float64(p.frames))
@@ -986,33 +1071,29 @@ func (p *perfStats) report(now time.Time, playing bool) {
 		var secs C.double
 		C.os_present_stats(&secs)
 	}
-	p.frames, p.maxGap, p.from, p.spent = 0, 0, now, [7]time.Duration{}
+	p.frames, p.maxGap, p.from, p.spent, p.hitches, p.maxWork = 0, 0, now, [7]time.Duration{}, 0, 0
 }
 
 // otherDesktopWidgets: the Mac's own desktop widgets (Calendar, Photos, Weather …, macOS 14+) —
-// the lyrics keep clear of them like they do of Orbit's. Asked at most every 5 s.
-var (
-	deskWidgets   []RECT
-	deskWidgetsAt time.Time
-	deskWidgetLog string
-)
+// the lyrics keep clear of them like they do of Orbit's. Listed by windowWatcher; never waits.
+var deskWidgetLog string
 
 func otherDesktopWidgets() []RECT {
-	if time.Since(deskWidgetsAt) < 5*time.Second {
-		return deskWidgets
+	ar := workArea()
+	winList.Lock()
+	winList.wanted = time.Now()
+	winList.scrW, winList.scrH = float64(ar.Right-ar.Left)/float64(C.os_scale()), float64(ar.Bottom-ar.Top)/float64(C.os_scale())
+	if !winList.running {
+		winList.running = true
+		go windowWatcher(float64(C.os_scale()))
 	}
-	deskWidgetsAt = time.Now()
-	var r [256]C.double
-	n := int(C.os_desktop_widgets(&r[0], 64))
-	deskWidgets = deskWidgets[:0]
-	for i := 0; i < n; i++ {
-		deskWidgets = append(deskWidgets, RECT{int32(r[4*i]), int32(r[4*i+1]), int32(r[4*i] + r[4*i+2]), int32(r[4*i+1] + r[4*i+3])})
-	}
-	if s := fmt.Sprint(deskWidgets); s != deskWidgetLog {
+	ds := append([]RECT(nil), winList.widgets...)
+	winList.Unlock()
+	if s := fmt.Sprint(ds); s != deskWidgetLog {
 		deskWidgetLog = s
-		logf("macOS desktop widgets the lyrics avoid: %d %v", len(deskWidgets), deskWidgets)
+		logf("macOS desktop widgets the lyrics avoid: %d %v", len(ds), ds)
 	}
-	return deskWidgets
+	return ds
 }
 
 // profileOnSignal (ORBIT_PERF=1, tests): kill -USR1 records 12 s of where the CPU goes to

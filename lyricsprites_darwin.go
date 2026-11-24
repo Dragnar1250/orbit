@@ -13,6 +13,7 @@ import "C"
 import (
 	"fmt"
 	"math"
+	"time"
 	"unsafe"
 )
 
@@ -94,6 +95,8 @@ func makeSprite(r run, F float64, fx int) *sprite {
 func (w *Widget) spriteRuns(runs []run, ox, oy float32, F float64, fxFor func(run) int) []run {
 	spriteFrame++
 	var rest []run
+	made := time.Now()
+	budget := 0 // words drawn this frame
 	var out []C.OSprite
 	for _, r := range runs {
 		if !spriteable(r) || r.alpha <= 0.01 {
@@ -106,6 +109,12 @@ func (w *Widget) spriteRuns(runs []run, ox, oy float32, F float64, fxFor func(ru
 		k := spriteKey(r, fx)
 		sp := sprites[k]
 		if sp == nil {
+			// a new line brings several words at once: drawing them all in one frame would make
+			// it late. Past 4 ms the rest wait for the next frame (they are just appearing).
+			if budget > 0 && time.Since(made) > 4*time.Millisecond {
+				continue
+			}
+			budget++
 			if sp = makeSprite(r, F, fx); sp == nil {
 				rest = append(rest, r)
 				continue
