@@ -19,13 +19,30 @@ static double tickHz;
 /* ---------- screens (Orbit works in pixels, y down from the top of the main screen) ---------- */
 
 static NSScreen *mainScreen(void) { return NSScreen.screens.count ? NSScreen.screens[0] : NSScreen.mainScreen; }
+
+// the screen's numbers are asked for many times a frame; asking AppKit each time showed up as a
+// fifth of the CPU — kept here, renewed when the screens change (and every 2 s, to be safe)
+static double scrScale = 0, scrTop, scrAt;
+static NSRect scrVisible;
+static void screenInfo(void) {
+	double now = CFAbsoluteTimeGetCurrent();
+	if (scrScale > 0 && now - scrAt < 2) return;
+	scrAt = now;
+	NSScreen *m = mainScreen();
+	scrScale = m.backingScaleFactor ?: 1;
+	scrTop = NSMaxY(m.frame);
+	scrVisible = m.visibleFrame;
+}
+void os_screens_moved(void) { scrScale = 0; }
+
 double os_scale(void) {
 	static double forced = -1; // ORBIT_SCALE=2: draw as many pixels as a Retina screen (tests)
 	if (forced < 0) { const char *e = getenv("ORBIT_SCALE"); forced = e ? atof(e) : 0; }
 	if (forced > 0) return forced;
-	return mainScreen().backingScaleFactor ?: 1;
+	screenInfo();
+	return scrScale;
 }
-static double mainTop(void) { return NSMaxY(mainScreen().frame); }
+static double mainTop(void) { screenInfo(); return scrTop; }
 
 static void toPx(NSRect r, double *out) {
 	double s = os_scale();
@@ -35,7 +52,7 @@ static void toPx(NSRect r, double *out) {
 	out[3] = r.size.height * s;
 }
 
-void os_work_area(double *out) { toPx(mainScreen().visibleFrame, out); }
+void os_work_area(double *out) { screenInfo(); toPx(scrVisible, out); }
 
 int os_screens(double *out, int max) {
 	int n = 0;
@@ -551,7 +568,7 @@ void os_run(const char *iconPath) {
 		for (NSString *name in @[@"com.spotify.client.PlaybackStateChanged", @"com.apple.Music.playerInfo"]) {
 			[[NSDistributedNotificationCenter defaultCenter] addObserverForName:name object:nil queue:nil usingBlock:^(NSNotification *n) { goMediaPing(); }];
 		}
-		[[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidChangeScreenParametersNotification object:nil queue:nil usingBlock:^(NSNotification *n) { os_screens_changed(); goScreensChanged(); }];
+		[[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidChangeScreenParametersNotification object:nil queue:nil usingBlock:^(NSNotification *n) { os_screens_moved(); os_screens_changed(); goScreensChanged(); }];
 		os_set_rate(2);
 		[NSApp run];
 	}
