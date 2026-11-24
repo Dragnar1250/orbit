@@ -67,6 +67,10 @@ static void og_apply(OG *g) {
 	CGContextSetTextMatrix(g->ctx, CGAffineTransformMakeScale(1, -1)); // text upright in the flipped space
 }
 
+// what is alive (the perf log shows it: a leak would show as numbers that only grow)
+long liveOG, liveOGBytes, liveSurfBytes, liveImg, liveImgBytes;
+void og_live(long *out) { out[0] = liveOG; out[1] = liveOGBytes; out[2] = liveSurfBytes; out[3] = liveImg; out[4] = liveImgBytes; }
+
 OG *og_new(int w, int h) {
 	if (w < 1) w = 1;
 	if (h < 1) h = 1;
@@ -86,6 +90,8 @@ OG *og_new(int w, int h) {
 	g->eoClips = CFArrayCreateMutable(NULL, 0, &kCFTypeArrayCallBacks);
 	g->interp = 3;
 	og_apply(g);
+	liveOG++;
+	liveOGBytes += (long)w * h * 4;
 	return g;
 }
 
@@ -107,6 +113,7 @@ static int og_bind(OG *g, int i) {
 		g->sctx[i] = CGBitmapContextCreate(IOSurfaceGetBaseAddress(g->surf[i]), g->w, g->h, 8, IOSurfaceGetBytesPerRow(g->surf[i]), rgb(), kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
 		IOSurfaceUnlock(g->surf[i], 0, NULL);
 		if (!g->sctx[i]) { CFRelease(g->surf[i]); g->surf[i] = NULL; return 0; }
+		liveSurfBytes += (long)IOSurfaceGetAllocSize(g->surf[i]);
 		CGContextTranslateCTM(g->sctx[i], 0, g->h);
 		CGContextScaleCTM(g->sctx[i], 1, -1);
 		CGContextSaveGState(g->sctx[i]);
@@ -168,7 +175,7 @@ void og_free(OG *g) {
 		if (g->locked) IOSurfaceUnlock(g->surf[g->cur], 0, NULL);
 		for (int i = 0; i < 4; i++) {
 			if (g->sctx[i]) { CGContextRestoreGState(g->sctx[i]); CGContextRelease(g->sctx[i]); }
-			if (g->surf[i]) CFRelease(g->surf[i]);
+			if (g->surf[i]) { liveSurfBytes -= (long)IOSurfaceGetAllocSize(g->surf[i]); CFRelease(g->surf[i]); }
 		}
 		CFRelease(g->clips);
 		CFRelease(g->eoClips);
@@ -180,6 +187,8 @@ void og_free(OG *g) {
 	CFRelease(g->clips);
 	CFRelease(g->eoClips);
 	free(g->bits);
+	liveOG--;
+	liveOGBytes -= (long)g->w * g->h * 4;
 	free(g);
 }
 
@@ -486,6 +495,8 @@ OImg *og_img_from_bytes(const void *b, int n) {
 	if (!img) return NULL;
 	OImg *o = calloc(1, sizeof(OImg));
 	o->img = flatten(img);
+	liveImg++;
+	liveImgBytes += (long)CGImageGetBytesPerRow(o->img) * CGImageGetHeight(o->img);
 	return o;
 }
 
@@ -499,6 +510,8 @@ OImg *og_img_from_file(const char *path) {
 	if (!img) return NULL;
 	OImg *o = calloc(1, sizeof(OImg));
 	o->img = flatten(img);
+	liveImg++;
+	liveImgBytes += (long)CGImageGetBytesPerRow(o->img) * CGImageGetHeight(o->img);
 	return o;
 }
 
@@ -508,7 +521,7 @@ OG *og_img_og(OImg *o) { return o ? o->og : NULL; }
 
 void og_img_free(OImg *o) {
 	if (!o) return;
-	if (o->img) CGImageRelease(o->img);
+	if (o->img) { liveImg--; liveImgBytes -= (long)CGImageGetBytesPerRow(o->img) * CGImageGetHeight(o->img); CGImageRelease(o->img); }
 	free(o);
 }
 

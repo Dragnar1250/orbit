@@ -41,3 +41,4 @@ typedef struct { void *img, *glow; double x, y, ax, ay, w, h, rot, sx, sy, alpha
 void ow_sprites(void *w, int n, const OSprite *sp);
 void os_cgimage_release(void *img);
 double os_tick_hz(void);
+long os_present_bytes(void);

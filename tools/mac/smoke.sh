@@ -153,7 +153,7 @@ scen() {
   late=$(echo "$last" | grep -oE '[0-9]+ late frames' | cut -d' ' -f1)
   long=$(echo "$last" | grep -oE 'longest frame [0-9.]+' | awk '{print $3}')
   sw=$(echo "$lines" | grep -oE 'longest frame [0-9.]+' | awk '{print $3}' | sort -n | tail -1)
-  echo "SCEN $(printf '%-28s' "$name") ${fps:-?} fps, ${late:-?} late, longest ${long:-?} ms (switching: ${sw:-?} ms)"
+  echo "SCEN $(printf '%-28s' "$name") ${fps:-?} fps, ${late:-?} late, longest ${long:-?} ms (switching: ${sw:-?} ms) · $(ps -o rss= -p $PID | awk '{printf "%d MB", $1/1024}') · $(echo "$last" | grep -oE 'memory: .*')"
   awk -v f="${fps:-0}" -v l="${late:-99}" -v t="$FPSWANT" 'BEGIN{exit !(f < t*0.95 || l > 3)}' && SLOW="$SLOW
   $name: ${fps:-?} fps, ${late:-?} late"
 }
@@ -187,6 +187,8 @@ set_opt FsKind 1; act fullscreen true; sleep 2
 for b in 0 1 2 3 4; do scen "desktop skin $b" SkinBg=$b; done
 act fullscreen false; sleep 1
 FPSWANT=60
+# song changes: new cover, new lyrics, every picture rebuilt
+for i in 1 2 3 4; do kill -USR2 $PID; scen "song change $i"; done
 # quick switching back and forth must not crash or leak
 for i in $(seq 1 40); do set_opt LyricsStyle $((i % 29)); set_opt DiscStyle $((i % 7)); set_opt HaloStyle $((i % 6)); sleep 0.15; done
 alive "fast switching"

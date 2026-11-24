@@ -984,6 +984,20 @@ func fakePlay() {
 	media.SetTrack("Swim", "Chase Atlantic", "Phases", "spotify")
 	media.SetDuration(keyOf("Swim", "Chase Atlantic"), 240)
 	media.SetPosition(20, true)
+	// kill -USR2: the next song (a song change in the tests)
+	next := make(chan os.Signal, 1)
+	signal.Notify(next, syscall.SIGUSR2)
+	go func() {
+		songs := [][3]string{{"Sweater Weather", "The Neighbourhood", "I Love You."}, {"Swim", "Chase Atlantic", "Phases"}}
+		for i := 0; ; i++ {
+			<-next
+			sg := songs[i%2]
+			media.SetTrack(sg[0], sg[1], sg[2], "spotify")
+			media.SetDuration(keyOf(sg[0], sg[1]), 240)
+			media.SetPosition(30, true)
+			logf("test: now playing %s", sg[0])
+		}
+	}()
 	buf := make([]float32, 1440)
 	t := 0.0
 	for {
@@ -1066,7 +1080,13 @@ func (p *perfStats) report(now time.Time, playing bool) {
 				out += fmt.Sprintf(" %s %.2f ms", perfNames[i], float64(d.Microseconds())/1000/float64(p.frames))
 			}
 		}
-		logf("%s a frame", out)
+		var lv [5]C.long
+		C.og_live(&lv[0])
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+		mb := func(b C.long) float64 { return float64(b) / (1 << 20) }
+		out += fmt.Sprintf(" a frame · memory: Go %.0f MB, %d canvases %.0f MB, surfaces %.0f+%.0f MB, %d pictures %.0f MB, %d words", float64(ms.HeapInuse)/(1<<20), lv[0], mb(lv[1]), mb(lv[2]), mb(C.os_present_bytes()), lv[3], mb(lv[4]), len(sprites))
+		logf("%s", out)
 	} else {
 		var secs C.double
 		C.os_present_stats(&secs)

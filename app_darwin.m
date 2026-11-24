@@ -86,8 +86,9 @@ int os_mouse_down(void) { return (NSEvent.pressedMouseButtons & 1) != 0; }
 	int w, h, cur;
 }
 @end
+long livePresentBytes;
 @implementation OrbitSurfaces
-- (void)drop { for (int i = 0; i < 3; i++) if (s[i]) { CFRelease(s[i]); s[i] = NULL; } w = h = 0; }
+- (void)drop { for (int i = 0; i < 3; i++) if (s[i]) { livePresentBytes -= (long)IOSurfaceGetAllocSize(s[i]); CFRelease(s[i]); s[i] = NULL; } w = h = 0; }
 - (void)dealloc { [self drop]; }
 @end
 
@@ -115,7 +116,7 @@ static void presentOn(CALayer *l, OrbitSurfaces *ps, OG *g, double scale) {
 	}
 	int i = (ps->cur + 1) % 3;
 	for (int k = 0; k < 3; k++, i = (i + 1) % 3) { // one the window server isn't reading
-		if (!ps->s[i]) ps->s[i] = newSurface(w, h);
+		if (!ps->s[i]) { ps->s[i] = newSurface(w, h); if (ps->s[i]) livePresentBytes += (long)IOSurfaceGetAllocSize(ps->s[i]); }
 		if (ps->s[i] && !IOSurfaceIsInUse(ps->s[i])) break;
 	}
 	IOSurfaceRef sf = ps->s[i];
@@ -715,3 +716,5 @@ void ow_sprites(void *wp, int n, const OSprite *sp) {
 		}
 	}
 }
+
+long os_present_bytes(void) { return livePresentBytes; }
