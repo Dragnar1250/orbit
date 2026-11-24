@@ -139,9 +139,9 @@ func (w *Widget) spriteRuns(runs []run, ox, oy float32, F float64, fxFor func(ru
 		C.ow_sprites(unsafe.Pointer(w.win), C.int(len(out)), &out[0])
 	}
 	w.noMain = runs != nil && len(rest) == 0
-	if len(sprites) > 160 { // forget words not shown for a few seconds
+	if len(sprites) > 48 { // forget words not shown for a couple of seconds
 		for k, sp := range sprites {
-			if spriteFrame-sp.used > 180 {
+			if spriteFrame-sp.used > 90 {
 				sp.free()
 				delete(sprites, k)
 			}
