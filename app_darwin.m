@@ -131,9 +131,9 @@ void os_present_free(void **state) {
 
 // A widget's window holds up to four pictures, bottom to top: the soft layer (glows and light,
 // drawn at a quarter of the pixels and stretched by the GPU), a still picture (the record without
-// its label), the turning label (turned by the GPU), the main picture and a still picture on top
-// (the record's shine and arm).
-enum { LSoft, LBase, LSpin, LMain, LTop, LCount };
+// its label), the turning label (turned by the GPU), rings of light (the record's groove light,
+// drawn by the GPU), the main picture and a still picture on top (the record's shine and arm).
+enum { LSoft, LBase, LSpin, LRings, LMain, LTop, LCount };
 
 static CALayer *newLayer(void) {
 	CALayer *l = [CALayer layer];
@@ -636,4 +636,42 @@ void ow_motion(void *wp, double sx, double sy, double cx, double cy, double glow
 	t = CATransform3DTranslate(t, -px, -py, 0);
 	root.sublayerTransform = t;
 	if (v->layers[LSoft]) v->layers[LSoft].opacity = glow;
+}
+
+// ow_rings: n circles of light around (cx, cy) pixels — radius r, width w, opacity a — in colour c:
+// the record's groove light, drawn by the GPU (n = 0: none)
+void ow_rings(void *wp, int n, const double *r, const double *w, const double *a, uint32_t c, double cx, double cy) {
+	OrbitWidgetView *v = (OrbitWidgetView *)((__bridge NSWindow *)wp).contentView;
+	if (n <= 0) { if (v->layers[LRings]) v->layers[LRings].hidden = YES; return; }
+	double s = os_scale();
+	CALayer *box = [v part:LRings];
+	box.hidden = NO;
+	if (!CGRectEqualToRect(box.frame, v.layer.bounds)) box.frame = v.layer.bounds;
+	NSArray *subs = box.sublayers;
+	while ((int)subs.count < n) {
+		CAShapeLayer *sl = [CAShapeLayer layer];
+		NSNull *no = NSNull.null;
+		sl.actions = @{@"path": no, @"lineWidth": no, @"opacity": no, @"strokeColor": no, @"hidden": no, @"position": no, @"bounds": no};
+		sl.fillColor = nil;
+		[box addSublayer:sl];
+		subs = box.sublayers;
+	}
+	CGColorRef col = CGColorCreateSRGB(((c >> 16) & 255) / 255.0, ((c >> 8) & 255) / 255.0, (c & 255) / 255.0, 1);
+	double px = cx / s, py = box.bounds.size.height - cy / s;
+	for (int i = 0; i < (int)subs.count; i++) {
+		CAShapeLayer *sl = subs[i];
+		if (i >= n || a[i] <= 0.004) { sl.hidden = YES; continue; }
+		sl.hidden = NO;
+		CGRect cr = CGRectMake(px - r[i] / s, py - r[i] / s, 2 * r[i] / s, 2 * r[i] / s);
+		CGPathRef old = sl.path;
+		if (!old || !CGRectEqualToRect(CGPathGetBoundingBox(old), cr)) {
+			CGPathRef p = CGPathCreateWithEllipseInRect(cr, NULL);
+			sl.path = p;
+			CGPathRelease(p);
+		}
+		sl.lineWidth = w[i] / s;
+		sl.opacity = a[i];
+		sl.strokeColor = col;
+	}
+	CGColorRelease(col);
 }

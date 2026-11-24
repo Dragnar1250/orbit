@@ -136,13 +136,14 @@ func otherDesktopWidgets() []RECT { return nil }
 
 // The soft layer and GPU-turned pictures are the Mac's (it draws on four times the pixels of a
 // Retina screen); Windows draws everything on the one canvas.
-func softBegin(g uintptr) bool                                 { return false }
-func softEnd(g uintptr)                                        {}
-func softBlur(g uintptr, r float32)                            {}
-func softClear(g uintptr)                                      {}
-func (w *Widget) useSoft(k float64, only bool)                 {}
-func (w *Widget) gpuLayers() bool                              { return false }
-func (w *Widget) setBase(b *Bitmap, ver int)                   {}
-func (w *Widget) setTop(b *Bitmap, ver int)                    {}
-func (w *Widget) gpuMotion(sx, sy, cx, cy, glow float64)       {}
-func (w *Widget) spin(b *Bitmap, ver int, cx, cy, deg float64) {}
+func softBegin(g uintptr) bool                                            { return false }
+func softEnd(g uintptr)                                                   {}
+func softBlur(g uintptr, r float32)                                       {}
+func softClear(g uintptr)                                                 {}
+func (w *Widget) useSoft(k float64, only bool)                            {}
+func (w *Widget) gpuLayers() bool                                         { return false }
+func (w *Widget) setBase(b *Bitmap, ver int)                              {}
+func (w *Widget) setTop(b *Bitmap, ver int)                               {}
+func (w *Widget) gpuMotion(sx, sy, cx, cy, glow float64)                  {}
+func (w *Widget) rings(r, wd, a []float64, c uint32, cx, cy float64) bool { return false }
+func (w *Widget) spin(b *Bitmap, ver int, cx, cy, deg float64)            {}

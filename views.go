@@ -440,9 +440,12 @@ func (v *VinylView) drawLayered() {
 		}
 		softEnd(g)
 	}
+	// the groove light: rings the GPU draws (nothing else of the record changes every frame)
+	var rr, rw, ra []float64
 	if cfg.GrooveLight {
-		v.drawGrooveLight(g)
+		rr, rw, ra = v.grooveRings()
 	}
+	v.w.rings(rr, rw, ra, v.grooveColor(), float64(cx), float64(cy))
 	v.w.present()
 	v.w.setBase(v.base, v.layerVer)
 	v.w.spin(v.label, v.layerVer, float64(cx), float64(cy), v.angle)
@@ -933,6 +936,39 @@ func (v *VinylView) drawCard(g uintptr) {
 }
 
 // drawGrooveLight: the music lights up the grooves — bass on the outside, highs near the label.
+// grooveRings: the groove light's rings (radius, width, opacity) for this frame
+func (v *VinylView) grooveRings() (r, w, a []float64) {
+	R := v.R
+	inner := 0.68
+	if cfg.DiscStyle == discPicture {
+		inner = 0.4
+	}
+	const rings = 12
+	for i := 0; i < rings; i++ {
+		lo, hi := i*40/rings, (i+1)*40/rings
+		var lv float64
+		for b := lo; b < hi; b++ {
+			lv = math.Max(lv, float64(v.bands[b]))
+		}
+		lv = math.Min(1, lv*cfg.HaloSens)
+		if lv < 0.08 {
+			lv = 0
+		}
+		r = append(r, R*(0.975-(0.975-inner)*float64(i)/float64(rings-1)))
+		w = append(w, R*0.012+lv*R*0.012)
+		a = append(a, lv*0.55)
+	}
+	return
+}
+
+func (v *VinylView) grooveColor() uint32 {
+	c := accent()
+	if cfg.DiscStyle != discPicture && cfg.DiscStyle != discBlack {
+		c = mixColor(discColor(), 0xFFFFFFFF, 0.35)
+	}
+	return c
+}
+
 func (v *VinylView) drawGrooveLight(g uintptr) {
 	R, cx, cy := float32(v.R), float32(v.cx), float32(v.cy)
 	c := accent()

@@ -54,6 +54,7 @@ type Widget struct {
 	// the soft layer under the main picture (see softBegin) and the turning label
 	softK     float64 // its size per point (0: none)
 	softOnly  bool    // everything is drawn on the soft layer (the screen glow)
+	noMain    bool    // its other layers say it all (the record): no main picture
 	soft      *Canvas
 	softUsed  bool
 	softShown bool
@@ -176,7 +177,19 @@ func (w *Widget) gpuMotion(sx, sy, cx, cy, glow float64) {
 // setBase / setTop: still pictures under the label (layer 1) and over everything (layer 4),
 // sent when ver changes
 func (w *Widget) setBase(b *Bitmap, ver int) { w.setStill(1, &w.baseVer, b, ver) }
-func (w *Widget) setTop(b *Bitmap, ver int)  { w.setStill(4, &w.topVer, b, ver) }
+func (w *Widget) setTop(b *Bitmap, ver int)  { w.setStill(5, &w.topVer, b, ver) }
+
+// rings: circles of light drawn by the GPU (radius, width, opacity per ring; nil: none). The
+// widget then shows no main picture of its own.
+func (w *Widget) rings(r, wd, a []float64, c uint32, cx, cy float64) bool {
+	w.noMain = true
+	if len(r) == 0 {
+		C.ow_rings(unsafe.Pointer(w.win), 0, nil, nil, nil, 0, 0, 0)
+		return true
+	}
+	C.ow_rings(unsafe.Pointer(w.win), C.int(len(r)), (*C.double)(unsafe.Pointer(&r[0])), (*C.double)(unsafe.Pointer(&wd[0])), (*C.double)(unsafe.Pointer(&a[0])), C.uint32_t(c), C.double(cx), C.double(cy))
+	return true
+}
 
 func (w *Widget) setStill(layer int, have *int, b *Bitmap, ver int) {
 	if b == nil {
@@ -231,7 +244,7 @@ func (w *Widget) present() {
 		return
 	}
 	C.ow_level(unsafe.Pointer(w.win), C.int(w.level()))
-	if w.softOnly {
+	if w.softOnly || w.noMain {
 		C.ow_show(unsafe.Pointer(w.win), nil, C.double(w.x), C.double(w.y), C.double(w.w), C.double(w.h), C.double(float64(w.outAlpha())/255))
 	} else {
 		raw := (*C.OG)(unsafe.Pointer(w.canvas.g)) // (not og(): that would start the next picture)
