@@ -1,3 +1,4 @@
+#pragma once
 // The Mac drawing layer (gdip_darwin.m): opaque handles for Go.
 #include <stdint.h>
 typedef struct OG OG;

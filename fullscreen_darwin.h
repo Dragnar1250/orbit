@@ -1,3 +1,4 @@
+#pragma once
 void *fs_open(double x, double y, double w, double h);
 void fs_show(OG *g);
 void fs_close(void);

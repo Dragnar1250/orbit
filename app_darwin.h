@@ -1,3 +1,4 @@
+#pragma once
 // Orbit for macOS: the Cocoa functions Go calls (app_darwin.m).
 double os_scale(void);
 void os_work_area(double *out);
