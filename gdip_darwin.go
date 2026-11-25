@@ -371,11 +371,17 @@ func drawGlowPath(g, path uintptr, fill uint32, glow uint32, glowAmt float32, sh
 			fillPathColor(g, path, argb(uint8(float64(fill>>24)*0.45), 0, 0, 0))
 			gTranslate(g, 0, -2)
 		}
-		if glowAmt > 0 {
-			fillPathColor(g, path, withAlpha(glow|0xFF000000, math.Min(1, float64(glow>>24)/255*0.85)))
+		if glowAmt > 0 { // the same three faint outlines as on Windows (a neon edge round the letters,
+			// not a cloud over the whole word), only softened a little by the blur
+			for i, wmul := range []float32{1.0, 0.6, 0.3} {
+				a := float64(glow>>24) / 255 * []float64{0.10, 0.16, 0.24}[i]
+				p := newPen(withAlpha(glow|0xFF000000, a), glowAmt*wmul)
+				drawPathPen(g, p, path)
+				freePen(p)
+			}
 		}
 		softEnd(g)
-		softBlur(g, float32(math.Max(2, float64(glowAmt)*0.45)))
+		softBlur(g, float32(math.Max(1.5, float64(glowAmt)*0.12)))
 		fillPathColor(g, path, fill)
 		return
 	}

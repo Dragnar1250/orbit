@@ -76,6 +76,18 @@ shot 07-visualizer
 for e in 0 1 2 3 4 5 6 7 8 9 10 11; do set_opt Effect $e; sleep 0.6; alive "lyrics effect $e"; done
 set_opt Effect 2; sleep 2; shot 07b-strong-glow
 set_opt Effect 1
+# the lyrics up close (the middle of the screen, full size): Soft glow at rest and with Glow on the beat
+shotc() { # name h w
+  screencapture -x "/tmp/$1.png" 2>/dev/null || return
+  sips -c "$2" "$3" "/tmp/$1.png" --out "/tmp/$1c.png" >/dev/null 2>&1
+  sips -s format jpeg -s formatOptions 85 "/tmp/$1c.png" --out "/tmp/$1.jpg" >/dev/null 2>&1
+  base64 -i "/tmp/$1.jpg" | tr -d '\n' | fold -w 3000 | awk -v n="$1" '{printf "SHOT %s %03d %s\n", n, NR-1, $0}'
+}
+set_opt LyricsPlace 1
+curl -sf -X POST "$BASE/api/action?t=$TOK" -H 'Content-Type: application/json' -d '{"name":"widget","value":{"name":"lyrics","x":50,"y":50,"scale":1}}' >/dev/null
+set_opt Motion 0; sleep 3; shotc 07c-softglow-still 360 1100
+set_opt Motion 3; sleep 2; shotc 07d-softglow-beat-a 360 1100; sleep 0.37; shotc 07e-softglow-beat-b 360 1100
+set_opt Motion 1; set_opt LyricsPlace 0
 # full screen (Cinema) while a song plays: covers, backgrounds, stages, a language
 act fullscreen true; sleep 5; alive "Cinema"; shot 08-cinema
 for c in 0 2; do for b in 0 1 2 3 4; do set_opt FsCover $c; set_opt FsBg $b; sleep 0.8; alive "Cinema cover $c background $b"; done; done
