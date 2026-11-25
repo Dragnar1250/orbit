@@ -52,6 +52,54 @@ type spotifyState struct {
 	shuffle, repeat int    // Spotify's own answer (-1 unknown): used when Windows doesn't say
 	modesAt         time.Time
 	notes           []string // short messages for full screen ("Added to the queue", errors)
+	artFor, artURL  string   // the playing song's title and its biggest cover on Spotify
+}
+
+// spotifyBigArt: Spotify's own cover of the song with this title, at full size (the same
+// picture the player shows — nothing to compare). "" when unknown.
+func spotifyBigArt(title string) string {
+	spotify.Lock()
+	defer spotify.Unlock()
+	if spotify.artURL == "" || alnum(cleanTitle(spotify.artFor)) != alnum(cleanTitle(title)) {
+		return ""
+	}
+	return spotify.artURL
+}
+
+// parseCurrentArt: the biggest album picture of the song playing, from the queue answer.
+func parseCurrentArt(b []byte) (name, url string) {
+	var r struct {
+		Current *struct {
+			Name  string `json:"name"`
+			Album struct {
+				Images []struct {
+					URL   string `json:"url"`
+					Width int    `json:"width"`
+				} `json:"images"`
+			} `json:"album"`
+		} `json:"currently_playing"`
+	}
+	if json.Unmarshal(b, &r) != nil || r.Current == nil {
+		return "", ""
+	}
+	bw := 0
+	for _, im := range r.Current.Album.Images {
+		if im.Width > bw {
+			url, bw = im.URL, im.Width
+		}
+	}
+	return r.Current.Name, url
+}
+
+// spotifyMaxSize: Spotify's picture server keeps every cover in a few sizes; the 640 px name
+// turned into the full-size one (often 1000–2000 px). The 640 px one is tried after it.
+func spotifyMaxSize(u string) []string {
+	for _, k := range []string{"ab67616d0000b273", "ab67616d00001e02", "ab67616d00004851"} {
+		if strings.Contains(u, k) {
+			return []string{strings.Replace(u, k, "ab67616d000082c1", 1), strings.Replace(u, k, "ab67616d0000b273", 1)}
+		}
+	}
+	return []string{u}
 }
 
 var spotify = &spotifyState{shuffle: -1, repeat: -1}
@@ -262,6 +310,11 @@ func (s *spotifyState) fetchQueue(clientID, refresh string) (items []queueItem, 
 		return nil, "", nr, fmt.Errorf("Spotify queue: %d", resp.StatusCode)
 	}
 	playing, items = parseQueue(b)
+	if name, u := parseCurrentArt(b); name != "" && u != "" {
+		s.Lock()
+		s.artFor, s.artURL = name, u
+		s.Unlock()
+	}
 	return items, playing, nr, nil
 }
 

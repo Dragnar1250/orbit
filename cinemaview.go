@@ -1296,7 +1296,13 @@ func (f *FullView) cinemaKey(vk int) {
 	case 'H', 0x70:
 		c.help = !c.help
 	case 'Q':
-		f.say(fmt.Sprintf("%d×%d · %.1f ms a frame", f.winW, f.winH, c.frameMs))
+		cw, _ := imageSize(cover.img)
+		src := "player"
+		if f.hiImg != 0 && f.hiKey == cover.key {
+			cw, _ = imageSize(f.hiImg)
+			src = "big"
+		}
+		f.say(fmt.Sprintf("%d×%d · %.1f ms a frame · cover %d px (%s)", f.winW, f.winH, c.frameMs, cw, src))
 		logf("cinema %dx%d: %.1f ms a frame — %s — %s", f.winW, f.winH, c.frameMs, profLine(), frameStats())
 	case 'S':
 		openSettingsAt("fullscreen")

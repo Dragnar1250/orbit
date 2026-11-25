@@ -33,6 +33,8 @@ type FullView struct {
 
 	hiKey, hiBusy string
 	hiImg         uintptr
+	hiTries       int       // looked again (Spotify\'s cover may come in later)
+	hiNext        time.Time
 	hiVer         int
 
 	mouseAt   time.Time
@@ -122,9 +124,36 @@ func (f *FullView) Update(now time.Time, snap MediaSnap, bands [nBands]float32, 
 }
 
 func (f *FullView) fetchHiRes(t *Track) {
-	if !cfg.FsHiRes || t == nil || f.hiKey == t.Key || f.hiBusy == t.Key {
+	if !cfg.FsHiRes || t == nil || f.hiBusy == t.Key {
 		return
 	}
+	if f.hiKey == t.Key { // found, or looked for: look again a few times while there is none
+		if f.hiImg != 0 || f.hiTries >= 4 || time.Now().Before(f.hiNext) {
+			return
+		}
+		f.hiTries++
+		f.hiNext = time.Now().Add(8 * time.Second)
+		key, title := t.Key, t.Title
+		f.hiBusy = key
+		go func() {
+			defer func() { recover() }()
+			b := spotifyCover(title)
+			if b != nil {
+				_ = os.WriteFile(hiResPath(key), b, 0o644)
+			}
+			runOnUI(func() {
+				if fs == nil || fs.hiBusy != key {
+					return
+				}
+				fs.hiBusy = ""
+				if b != nil {
+					fs.useHiRes(key, b)
+				}
+			})
+		}()
+		return
+	}
+	f.hiTries, f.hiNext = 0, time.Now().Add(8*time.Second)
 	key, title, artist, album := t.Key, t.Title, t.Artist, t.Album
 	// already on disk (fetched earlier, or in the background while the song played): no wait
 	if b, err := os.ReadFile(hiResPath(key)); err == nil && len(b) > 0 {
@@ -153,8 +182,8 @@ func (f *FullView) fetchHiRes(t *Track) {
 // useHiRes shows the big cover if it really is this song's (iTunes may find another one).
 func (f *FullView) useHiRes(key string, b []byte) {
 	img := imageFromBytes(b)
-	if img != 0 && cover.key == key && cover.img != 0 && imageDiff(img, cover.img) > 0.16 {
-		logf("hi-res cover does not match the player's — keeping the original")
+	if img != 0 && cover.key == key && cover.img != 0 && imageDiff(img, cover.img) > 0.30 {
+		logf("hi-res cover does not match the player's (%.2f) — keeping the original", imageDiff(img, cover.img))
 		freeImage(img)
 		img = 0
 	}
@@ -175,6 +204,14 @@ func hiResPath(key string) string {
 func fetchHiResCached(key, title, artist, album string, ref *coverSig) []byte {
 	p := hiResPath(key)
 	if b, err := os.ReadFile(p); err == nil {
+		if len(b) > 0 {
+			return b
+		}
+		// none found before: Spotify may know it now (connected later, or its answer came in)
+		if b = spotifyCover(title); b == nil {
+			return nil
+		}
+		_ = os.WriteFile(p, b, 0o644)
 		return b
 	}
 	b, answered := findBigCover(title, artist, album, ref)

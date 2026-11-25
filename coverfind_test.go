@@ -86,3 +86,33 @@ func mustDecode(b []byte) image.Image {
 	}
 	return im
 }
+
+func TestSpotifyBigCover(t *testing.T) {
+	big := testCover(1400, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "ab67616d000082c1") {
+			w.Write(big)
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+	q := `{"currently_playing":{"name":"Flawless","album":{"images":[{"url":"` + srv.URL + `/image/ab67616d0000b273abc","width":640},{"url":"x/ab67616d00001e02abc","width":300}]}},"queue":[]}`
+	name, u := parseCurrentArt([]byte(q))
+	if name != "Flawless" || !strings.HasSuffix(u, "ab67616d0000b273abc") {
+		t.Fatal("current art", name, u)
+	}
+	spotify.Lock()
+	spotify.artFor, spotify.artURL = name, u
+	spotify.Unlock()
+	defer func() { spotify.Lock(); spotify.artFor, spotify.artURL = "", ""; spotify.Unlock() }()
+	if spotifyBigArt("Flawless (Remastered)") == "" || spotifyBigArt("Daddy Issues") != "" {
+		t.Fatal("matched by title only")
+	}
+	if b := spotifyCover("Flawless"); !bytes.Equal(b, big) {
+		t.Fatal("Spotify's full-size cover", len(b))
+	}
+	if b, _ := findBigCover("Flawless", "The Neighbourhood", "", nil); !bytes.Equal(b, big) {
+		t.Fatal("Spotify's own cover comes first")
+	}
+}

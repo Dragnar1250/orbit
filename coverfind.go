@@ -201,13 +201,17 @@ func download(u string, limit int) []byte {
 // service could be reached, so nothing should be remembered). ref is the player's own cover
 // at 8×8: only the same picture is accepted. Without ref, only the artist's own cover is taken.
 func findBigCover(title, artist, album string, ref *coverSig) (_ []byte, answered bool) {
+	if b := spotifyCover(title); b != nil {
+		return b, true
+	}
 	good, other, answered := coverCandidates(title, artist, album)
 	cands := good
 	if ref != nil {
 		cands = append(good, other...)
 	}
-	tries := 0
-	for _, u := range cands {
+	tries, nGood := 0, len(good)
+	logf("big cover: %d of the artist's own, %d others (answered %v) for %q", len(good), len(other), answered, title)
+	for i, u := range cands {
 		if tries >= 5 {
 			break
 		}
@@ -223,6 +227,7 @@ func findBigCover(title, artist, album string, ref *coverSig) (_ []byte, answere
 			}
 			im, _, err := image.Decode(bytes.NewReader(b))
 			if err != nil {
+				logf("big cover: %s not readable: %v", shortURL(v), err)
 				continue
 			}
 			if w, h := im.Bounds().Dx(), im.Bounds().Dy(); w < 600 || h < 600 {
@@ -233,7 +238,10 @@ func findBigCover(title, artist, album string, ref *coverSig) (_ []byte, answere
 				if s == nil {
 					continue
 				}
-				if d := sigDiff(s, ref); d > 0.16 {
+				d := sigDiff(s, ref)
+				// the artist's own cover a little off (another service's encoding, colours): still
+				// the same picture; anything further off is another cover
+				if d > 0.16 && !(d <= 0.30 && i < nGood) {
 					logf("big cover: %s is another picture (%.2f)", shortURL(v), d)
 					break // the smaller copy of it would be too
 				}
@@ -250,4 +258,23 @@ func shortURL(u string) string {
 		return p.Host
 	}
 	return "?"
+}
+
+// spotifyCover: Spotify's own cover of the playing song at full size (when Spotify is connected).
+func spotifyCover(title string) []byte {
+	u := spotifyBigArt(title)
+	if u == "" {
+		return nil
+	}
+	for _, v := range spotifyMaxSize(u) {
+		b := download(v, 12<<20)
+		if len(b) == 0 {
+			continue
+		}
+		if w, h := decodeSize(b); w >= 600 && h >= 600 {
+			logf("big cover: %dx%d from Spotify", w, h)
+			return b
+		}
+	}
+	return nil
 }

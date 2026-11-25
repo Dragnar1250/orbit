@@ -19,6 +19,20 @@ Engine, Lively or a normal picture) and shows:
 Works with Spotify and anything in the Windows media controls. Lyrics: lrclib.net
 
 
+NEW IN 1.23.6  -  THE FULL-SCREEN COVER STRAIGHT FROM SPOTIFY, FULL SIZE
+------------------------------------------------------------------------
+  - With Spotify connected (the "Up next" list), the full-screen
+    background now uses Spotify's own cover at full size (often 1000 to
+    2000 px) - exactly the picture the player shows, so nothing has to be
+    looked up or compared. Windows itself only hands Orbit a 300 px copy,
+    which is what looked blurry when stretched over the whole screen.
+  - Without Spotify connected: iTunes and Deezer as before, now also
+    accepted when the artist's own cover is only a little off in colour.
+  - When the sharp cover is not there yet, full screen looks again a few
+    times (every 8 s) instead of giving up for the song.
+  - Press Q in full screen: it shows the cover's size and where it came
+    from ("big" = the sharp one, "player" = Windows' small one).
+
 NEW IN 1.23.5  -  THE SHARP FULL-SCREEN BACKGROUND, NOW ALSO ON WINDOWS
 -----------------------------------------------------------------------
   - The real reason the "Cover" background stayed blurry on Windows: the
