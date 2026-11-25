@@ -19,6 +19,21 @@ Engine, Lively or a normal picture) and shows:
 Works with Spotify and anything in the Windows media controls. Lyrics: lrclib.net
 
 
+NEW IN 1.23.3  -  A SHARP COVER BEHIND FULL SCREEN, FOR EVERY SONG
+-----------------------------------------------------------------
+  - Spotify only gives Orbit a small cover (300 px). Spread across a big
+    screen it turned into grey mush whenever the sharp copy was not found.
+    Orbit now looks much harder for the big one: iTunes by song, then by
+    album, then Deezer - and only uses it when it really is the same
+    picture as the player's. Songs that found nothing before are tried
+    again.
+
+NEW IN 1.23.2  -  CHANGING THE FPS NO LONGER SLOWS ORBIT DOWN
+-------------------------------------------------------------
+  - Changing "FPS" in Settings used to start a second drawing loop (and
+    repeat the mouse, hotkey and timer setup) every time, so Orbit used
+    more and more CPU until it was restarted. Now it only changes the rate.
+
 NEW IN 1.23.1  -  THE COVER BACKGROUND, SHARP AGAIN
 ---------------------------------------------------
   - Cinema's "Cover" background is drawn as in 1.22.4 again: straight at

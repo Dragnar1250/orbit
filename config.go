@@ -387,7 +387,7 @@ type Config struct {
 
 const configVersion = 12
 
-const appVersion = "1.23.1"
+const appVersion = "1.23.3"
 
 var legacyFonts = []string{"Consolas", "Cascadia Mono", "Bahnschrift", "Segoe UI", "Segoe UI Black", "Impact", "Georgia", "Courier New", "Segoe Script", "Ink Free", "Lucida Console", "Trebuchet MS"}
 

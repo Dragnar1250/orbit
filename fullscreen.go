@@ -125,20 +125,21 @@ func (f *FullView) fetchHiRes(t *Track) {
 	if !cfg.FsHiRes || t == nil || f.hiKey == t.Key || f.hiBusy == t.Key {
 		return
 	}
-	key, title, artist := t.Key, t.Title, t.Artist
+	key, title, artist, album := t.Key, t.Title, t.Artist, t.Album
 	// already on disk (fetched earlier, or in the background while the song played): no wait
 	if b, err := os.ReadFile(hiResPath(key)); err == nil && len(b) > 0 {
 		f.useHiRes(key, b)
 		return
 	}
 	f.hiBusy = key
+	ref := coverRef(key) // the player's own cover: the big one must be the same picture
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
 				logf("hi-res cover panic: %v", r)
 			}
 		}()
-		b := fetchHiResCached(key, title, artist)
+		b := fetchHiResCached(key, title, artist, album, ref)
 		runOnUI(func() {
 			if fs == nil || fs.hiBusy != key {
 				return
@@ -166,16 +167,23 @@ func (f *FullView) useHiRes(key string, b []byte) {
 
 func hiResPath(key string) string {
 	h := sha1.Sum([]byte(key))
-	return filepath.Join(appDir(), "cache", "hires2k-"+hex.EncodeToString(h[:8])+".jpg")
+	return filepath.Join(appDir(), "cache", "cover2k-"+hex.EncodeToString(h[:8])+".jpg")
 }
 
 // fetchHiResCached downloads the big cover once and keeps it (an empty file = none found).
-func fetchHiResCached(key, title, artist string) []byte {
+// iTunes by song, by album, then Deezer; only the same picture as the player's (ref).
+func fetchHiResCached(key, title, artist, album string, ref *coverSig) []byte {
 	p := hiResPath(key)
 	if b, err := os.ReadFile(p); err == nil {
 		return b
 	}
-	b := fetchCoverHiRes(title, artist)
+	b, answered := findBigCover(title, artist, album, ref)
+	if len(b) == 0 && (ref == nil || !answered) {
+		return nil // offline, or not checked against the player's cover: try again later
+	}
+	if len(b) == 0 {
+		logf("big cover: none found for %q", title)
+	}
 	_ = os.MkdirAll(filepath.Dir(p), 0o755)
 	if os.WriteFile(p+".tmp", b, 0o644) == nil {
 		_ = os.Rename(p+".tmp", p)
@@ -191,7 +199,11 @@ func pruneHiRes(n int) {
 		_ = os.Remove(p)
 	}
 	pruneGlob("sq-*.jpg", 200) // Spotify queue pictures
-	pruneGlob("hires2k-*.jpg", n)
+	pruneGlob("cover2k-*.jpg", n)
+	old, _ = filepath.Glob(filepath.Join(appDir(), "cache", "hires2k-*.jpg")) // 1.14–1.23's (iTunes only)
+	for _, p := range old {
+		_ = os.Remove(p)
+	}
 }
 
 func pruneGlob(pattern string, n int) {
@@ -222,12 +234,38 @@ func prefetchHiRes(t *Track) {
 		return
 	}
 	hiPrefetchKey = t.Key
-	key, title, artist := t.Key, t.Title, t.Artist
+	key, title, artist, album := t.Key, t.Title, t.Artist, t.Album
 	go func() {
 		defer func() { recover() }()
 		time.Sleep(3 * time.Second) // the lyrics and the normal cover go first
-		fetchHiResCached(key, title, artist)
+		ch := make(chan *coverSig, 1)
+		runOnUI(func() { ch <- coverRef(key) })
+		var ref *coverSig
+		select {
+		case ref = <-ch:
+		case <-time.After(5 * time.Second):
+		}
+		fetchHiResCached(key, title, artist, album, ref)
 	}()
+}
+
+// coverRef: the player's cover of this song at 8×8 (nil if it has none yet). UI thread only.
+func coverRef(key string) *coverSig {
+	if cover.key != key || cover.img == 0 {
+		return nil
+	}
+	A := newBitmap(8, 8)
+	if A == nil {
+		return nil
+	}
+	defer A.Free()
+	drawCoverSquare(A.g, cover.img, 0, 0, 8)
+	var sig coverSig
+	for i := range sig {
+		c := pixel(A.bmp, i%8, i/8)
+		sig[i] = [3]float64{float64(c >> 16 & 255), float64(c >> 8 & 255), float64(c & 255)}
+	}
+	return &sig
 }
 
 // imageDiff: 0 = the same picture, 1 = opposite (compared at 8×8).
