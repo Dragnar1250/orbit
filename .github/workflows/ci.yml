@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
@@ -41,6 +43,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
@@ -67,6 +71,8 @@ jobs:
       contents: write # (only to keep the tested Orbit-mac.zip on a private draft release)
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
@@ -80,6 +86,8 @@ jobs:
         run: tools/mac/bundle.sh
       - name: Smoke test - start Orbit.app, drive its settings, talk to Apple Music, quit
         run: tools/mac/smoke.sh
+      - name: Upgrade from preview 6 - opened from Finder, Mac in Turkish, old settings and caches
+        run: tools/mac/upgrade.sh
       - name: The disk image opens and holds a working, signed app
         run: |
           for i in 1 2 3 4 5; do hdiutil attach -nobrowse -readonly dist/Orbit-mac.dmg -mountpoint /tmp/orbitdmg && break; sleep 5; done # (the runner is sometimes busy)
