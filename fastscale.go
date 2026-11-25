@@ -71,8 +71,17 @@ func lerp4(a, b, t uint32) uint32 {
 	return rb | ag<<8
 }
 
+// workers: how many cores Orbit's pixel work may use at once — half the PC (at least 2,
+// at most 6), so the desktop, the mouse and other apps always have room.
+func workers() int {
+	return scaleWorkers
+}
+
 var scaleWorkers = func() int {
-	n := runtime.NumCPU()
+	n := runtime.NumCPU() / 2
+	if n < 2 {
+		n = min(2, runtime.NumCPU())
+	}
 	if n > 6 {
 		n = 6 // leave the rest of the PC alone
 	}

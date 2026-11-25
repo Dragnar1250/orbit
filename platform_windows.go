@@ -1,6 +1,6 @@
 package main
 
-// Windows-only pieces the shared widgets use: dates in the user's language, the list of screens.
+// Windows-only parts of the shared widgets: dates, monitors, full-screen apps.
 
 import (
 	"syscall"
@@ -23,22 +23,11 @@ type systemTime struct{ Year, Month, DayOfWeek, Day, Hour, Minute, Second, Ms ui
 func localDate(t time.Time, picture string) string {
 	st := systemTime{uint16(t.Year()), uint16(t.Month()), uint16(t.Weekday()), uint16(t.Day()), 0, 0, 0, 0}
 	buf := make([]uint16, 128)
-	n := call(pGetDateFormatEx, 0, 0, uintptr(unsafe.Pointer(&st)), uintptr(unsafe.Pointer(u16(picture))), uintptr(unsafe.Pointer(&buf[0])), 128, 0)
+	n := call(pGetDateFormatEx, uintptr(unsafe.Pointer(u16(langLocale()))), 0, uintptr(unsafe.Pointer(&st)), uintptr(unsafe.Pointer(u16(picture))), uintptr(unsafe.Pointer(&buf[0])), 128, 0)
 	if n == 0 {
 		return ""
 	}
 	return syscall.UTF16ToString(buf)
-}
-
-func formatDate(t time.Time, long bool) string {
-	pic := "ddd, d MMM"
-	if long {
-		pic = "dddd, d MMMM"
-	}
-	if s := localDate(t, pic); s != "" {
-		return s
-	}
-	return englishDate(t, long)
 }
 
 type monitorInfo struct {
@@ -82,73 +71,26 @@ func fullscreenOn(m RECT) bool {
 	return r.Left <= m.Left && r.Top <= m.Top && r.Right >= m.Right && r.Bottom >= m.Bottom
 }
 
+func (w *Widget) capture(on bool) {
+	if on {
+		call(pSetCapture, w.hwnd)
+	} else {
+		call(pReleaseCapture)
+	}
+}
+func releaseCapture() { call(pReleaseCapture) }
+
+// raiseTop: above normal windows (the arranging bar, so "Done" can always be clicked)
+func (w *Widget) raiseTop() {
+	call(pSetWindowPos, w.hwnd, ^uintptr(0), 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE) // HWND_TOPMOST
+}
+
+// ctrlDown: is a Ctrl key held?
+func ctrlDown() bool { return call(pGetKeyState, 0x11)&0x8000 != 0 }
+
 func mediaKey(vk uintptr) {
 	call(pKeybdEvent, vk, 0, 0, 0)
 	call(pKeybdEvent, vk, 0, 2, 0)
 }
 
-// openURL: a link in the default app/browser.
-func openURL(u string) bool {
-	return call(pShellExecuteW, 0, uintptr(unsafe.Pointer(u16("open"))), uintptr(unsafe.Pointer(u16(u))), 0, 0, 1) > 32
-}
-
-// popupMenu: a small menu at the mouse; returns the picked item (-1: none).
-func popupMenu(items []string, checked int, owner uintptr) int {
-	m := call(pCreatePopupMenu)
-	for i, n := range items {
-		menuItem(m, 1+i, n, checked == i)
-	}
-	var pt POINT
-	call(pGetCursorPos, uintptr(unsafe.Pointer(&pt)))
-	id := int(call(pTrackPopupMenu, m, TPM_RIGHTBUTTON|TPM_RETURNCMD|TPM_BOTTOMALIGN, uintptr(pt.X), uintptr(pt.Y), 0, owner, 0))
-	call(pDestroyMenu, m)
-	return id - 1
-}
-
-func fsCapture(hwnd uintptr, on bool) {
-	if on {
-		call(pSetCapture, hwnd)
-	} else {
-		call(pReleaseCapture)
-	}
-}
-
-// fsInFront: the full-screen window is the active one.
-func fsInFront(f *FullView) bool { return call(pGetForegroundWnd) == f.hwnd }
-
-func showCursor(on bool) {
-	if on {
-		call(pSetCursor, call(pLoadCursorW, 0, 32512))
-	} else {
-		call(pSetCursor, 0)
-	}
-}
-
-// fsRefocus: after the menu took the focus, full screen takes it back.
-func fsRefocus() {
-	if fs != nil {
-		call(pSetForegroundWindow, fs.hwnd)
-	}
-}
-
-// otherDesktopWidgets: widgets of other apps on the desktop the lyrics should keep clear of (Mac only)
-func otherDesktopWidgets() []RECT { return nil }
-
-// The soft layer and GPU-turned pictures are the Mac's (it draws on four times the pixels of a
-// Retina screen); Windows draws everything on the one canvas.
-func softBegin(g uintptr) bool                                            { return false }
-func softEnd(g uintptr)                                                   {}
-func softBlur(g uintptr, r float32)                                       {}
-func softClear(g uintptr)                                                 {}
-func (w *Widget) useSoft(k float64, only bool)                            {}
-func (w *Widget) gpuLayers() bool                                         { return false }
-func (w *Widget) setBase(b *Bitmap, ver int)                              {}
-func (w *Widget) setTop(b *Bitmap, ver int)                               {}
-func (w *Widget) gpuMotion(sx, sy, cx, cy, glow float64)                  {}
-func (w *Widget) rings(r, wd, a []float64, c uint32, cx, cy float64) bool { return false }
-func (w *Widget) spin(b *Bitmap, ver int, cx, cy, deg float64)            {}
-
-// spriteRuns: the runs the GPU can't place as pictures (Windows: all of them)
-func (w *Widget) spriteRuns(runs []run, ox, oy float32, F float64, fxFor func(run) int) []run {
-	return runs
-}
+var pGetKeyState = user32.NewProc("GetKeyState")

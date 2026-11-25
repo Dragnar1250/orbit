@@ -746,7 +746,7 @@ func TestMigrateV3Theme(t *testing.T) {
 }
 
 func TestNewStylesEffectsThemes(t *testing.T) {
-	if len(styleNames) != 29 || styleNames[stSpotlight] != "Spotlight" || styleNames[stGlass] != "Glass" || styleNames[stScatter] != "Scatter" {
+	if len(styleNames) != 31 || styleNames[stSpotlight] != "Spotlight" || styleNames[stGlass] != "Glass" || styleNames[stScatter] != "Scatter" {
 		t.Fatal("style constants out of sync with names")
 	}
 	if len(effectNames) != 12 || effectNames[fxGlass] != "Glass" || effectNames[fxChromatic] != "Chromatic" {

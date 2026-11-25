@@ -176,11 +176,11 @@ func gImage(g, img uintptr, x, y, w, h float32) {
 	C.og_draw_image(og(g), oimg(img), C.float(x), C.float(y), C.float(w), C.float(h), 0, 0, 0, 0, 0)
 }
 
-func gImageAlpha(g, img uintptr, x, y, w, h, alpha float32) {
-	if img == 0 {
+func gImageAlpha(g, img uintptr, iw, ih int, x, y, w, h float32, alpha float64) {
+	if img == 0 || alpha <= 0.004 {
 		return
 	}
-	C.og_draw_image_alpha(og(g), oimg(img), C.float(x), C.float(y), C.float(w), C.float(h), C.float(alpha))
+	C.og_draw_image_alpha(og(g), oimg(img), C.float(x), C.float(y), C.float(w), C.float(h), C.float(math.Min(1, alpha)))
 }
 
 func gImageSrc(g, img uintptr, x, y, w, h, sx, sy, sw, sh float32) {

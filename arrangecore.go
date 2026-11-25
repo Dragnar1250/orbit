@@ -2,8 +2,7 @@
 
 package main
 
-// Arranging widgets — the same on Windows and Mac: sizes, dragging, resizing with the wheel,
-// the "Arrange" banner. Mouse capture and the window messages are platform code.
+// Arranging widgets with the mouse: shared by Windows and Mac.
 
 import (
 	"math"
@@ -165,6 +164,20 @@ func endDrag() {
 	}
 }
 
+func widgetAt(pt POINT) string {
+	for _, name := range arrangeWidgets {
+		w := widgetByName(name)
+		if w == nil || !w.visible || widgetLocked(name) {
+			continue
+		}
+		r := w.rect()
+		if pt.X >= r.Left && pt.X < r.Right && pt.Y >= r.Top && pt.Y < r.Bottom {
+			return name
+		}
+	}
+	return ""
+}
+
 var banner *Widget
 
 var bannerSig string
@@ -180,6 +193,11 @@ func updateBanner() {
 	}
 	ui := uiScale()
 	W, H := int(760*ui), int(54*ui)
+	{ // wide enough for the words in any language
+		aw, _ := measure(font("Segoe UI", 15*ui, true), T("Arrange mode"))
+		hw, _ := measure(font("Segoe UI", 13*ui, false), T("drag to move · scroll or pull a corner to resize"))
+		W = max(W, int(float64(aw+hw)+(22+18+30+116)*ui))
+	}
 	sig := ""
 	if bannerSig == "" {
 		sig = "x"
@@ -197,16 +215,20 @@ func updateBanner() {
 	freePath(path)
 	f := font("Segoe UI", 15*ui, true)
 	fs := font("Segoe UI", 13*ui, false)
-	drawText(g, f, "Arrange mode", float32(22*ui), float32(H)/2-f.size*0.75, float32(200*ui), 0xFFFFFFFF)
-	drawText(g, fs, "drag to move · scroll or pull a corner to resize", float32(150*ui), float32(H)/2-fs.size*0.72, float32(440*ui), 0xC8FFFFFF)
+	am := T("Arrange mode")
+	aw, _ := measure(f, am)
+	hx := float32(22*ui) + aw + float32(18*ui)
+	drawText(g, f, am, float32(22*ui), float32(H)/2-f.size*0.75, aw+float32(8*ui), 0xFFFFFFFF)
+	drawText(g, fs, T("drag to move · scroll or pull a corner to resize"), hx, float32(H)/2-fs.size*0.72, float32(W)-hx-float32(116*ui), 0xC8FFFFFF)
 	bw, bh := float32(96*ui), float32(H)-float32(16*ui)
 	bx := float32(W) - bw - float32(10*ui)
 	btn := roundRectPath(bx, float32(8*ui), bw, bh, bh/2)
 	fillPathColor(g, btn, accent()|0xFF000000)
 	freePath(btn)
 	ft := font("Segoe UI", 14*ui, true)
-	tw, _ := measure(ft, "Done ✓")
-	drawText(g, ft, "Done ✓", bx+(bw-tw)/2, float32(8*ui)+bh/2-ft.size*0.72, bw, 0xFF16120A)
+	done := T("Done ✓")
+	tw, _ := measure(ft, done)
+	drawText(g, ft, done, bx+(bw-tw)/2, float32(8*ui)+bh/2-ft.size*0.72, bw, 0xFF16120A)
 	wa := workArea()
 	banner.moveTo(int(wa.Left+wa.Right)/2-W/2, int(wa.Top)+int(18*ui))
 	banner.alpha = 255
@@ -217,17 +239,3 @@ func updateBanner() {
 
 // haloSquare: side of the visualizer square in pixels.
 func haloSquare(scale float64) int { return int(460 * uiScale() * scale) }
-
-func widgetAt(pt POINT) string {
-	for _, name := range arrangeWidgets {
-		w := widgetByName(name)
-		if w == nil || !w.visible || widgetLocked(name) {
-			continue
-		}
-		r := w.rect()
-		if pt.X >= r.Left && pt.X < r.Right && pt.Y >= r.Top && pt.Y < r.Bottom {
-			return name
-		}
-	}
-	return ""
-}

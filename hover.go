@@ -33,8 +33,10 @@ func setHover(name string) {
 
 // hoverCheck runs every frame: the mouse may have left without a move event reaching us
 // (a window popped up, the lyrics moved to a new spot, hover was switched off …).
+func scratching() bool { return vinyl != nil && vinyl.scr.on }
+
 func hoverCheck() {
-	if hoverName == "" || drag != nil {
+	if hoverName == "" || drag != nil || scratching() {
 		return
 	}
 	if !cfg.HoverEdit || editMode || widgetLocked(hoverName) {
@@ -49,7 +51,7 @@ func hoverCheck() {
 
 // hoverMove is called by the mouse hook for every move (UI thread).
 func hoverMove(pt POINT) {
-	if !cfg.HoverEdit || editMode || drag != nil || fs != nil {
+	if !cfg.HoverEdit || editMode || drag != nil || fs != nil || scratching() {
 		return
 	}
 	name := widgetAt(pt)
@@ -174,7 +176,7 @@ func drawHover(g uintptr, w, h float32, name string) {
 	if hoverBtn >= 0 && hoverBtn < len(rects) && hoverBtn < len(btns) { // the name of the box under the mouse
 		b := rects[hoverBtn]
 		f := font("Segoe UI", float64(11*ui), true)
-		lbl := btns[hoverBtn].label
+		lbl := T(btns[hoverBtn].label)
 		tw, th := measure(f, lbl)
 		x := b.X + b.W/2 - tw/2 - 7*ui
 		if x+tw+14*ui > w-2 { // the boxes sit at the right edge: keep the name inside
@@ -227,7 +229,7 @@ func toolbarAction(name string, i int) {
 			if name == "vinyl" { // the record's colour; show it on a record that has one
 				cfg.DiscColorMode = 2
 				cfg.DiscColor = nextPreset(cfg.DiscColor)
-				if cfg.DiscStyle == discPicture || cfg.DiscStyle == discBlack || cfg.DiscStyle == discGold {
+				if cfg.DiscStyle == discPicture || cfg.DiscStyle == discBlack || cfg.DiscStyle == discGold || cfg.DiscStyle == discCD || cfg.DiscStyle == discGlowDark {
 					cfg.DiscStyle = discColoured
 				}
 			} else { // the visualizer: the ambient light behind it

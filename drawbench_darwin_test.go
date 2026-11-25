@@ -92,7 +92,7 @@ func TestDrawCosts(t *testing.T) {
 			gTranslate(g, x+float32(b.w)/2, 200)
 			gRotate(g, 12)
 			gScale(g, 1.1, 1.1)
-			gImageAlpha(g, b.bmp, -float32(b.w)/2, -150, float32(b.w), float32(b.h), 0.7)
+			gImageAlpha(g, b.bmp, b.w, b.h, -float32(b.w)/2, -150, float32(b.w), float32(b.h), 0.7)
 			gReset(g)
 			x += float32(b.w)
 		}

@@ -28,7 +28,7 @@ osascript -e 'tell application "Safari" to quit' 2>/dev/null; sleep 2 # the sett
 for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather ShowGlow; do set_opt $k true; done
 sleep 3; alive "all widgets on"
 shot 02-widgets
-for s in $(seq 0 28); do set_opt LyricsStyle $s; sleep 0.1; done
+for s in $(seq 0 30); do set_opt LyricsStyle $s; sleep 0.1; done
 for s in 0 1 2 3 4 5; do set_opt HaloStyle $s; sleep 0.3; done; alive "visualizer styles"
 for s in 0 1 2 3; do set_opt DiscStyle $s; sleep 0.3; done; alive "turntable styles"
 for s in 0 1 2 3 4 5; do set_opt ClockStyle $s; sleep 0.3; done; alive "clock styles"
@@ -76,14 +76,13 @@ shot 07-visualizer
 for e in 0 1 2 3 4 5 6 7 8 9 10 11; do set_opt Effect $e; sleep 0.6; alive "lyrics effect $e"; done
 set_opt Effect 2; sleep 2; shot 07b-strong-glow
 set_opt Effect 1
-# full screen while a song plays: both kinds, every background, quick open/close
-set_opt FsKind 0; act fullscreen true; sleep 5; alive "full screen (music display)"; shot 08-fs-music
-for b in 0 1 2 3 4 5 6; do set_opt FsBg $b; sleep 0.8; alive "music display background $b"; done
-act fullscreen false; sleep 1
-set_opt FsKind 1; act fullscreen true; sleep 5; alive "full screen (desktop skin)"; shot 09-fs-skin
-for m in 0 1 2; do set_opt SkinCentre $m; sleep 0.8; alive "skin middle $m"; done
-for b in 0 1 2 3 4 5 6 7 8; do set_opt SkinBg $b; sleep 0.8; alive "skin background $b"; done
-set_opt SkinBg 9; sleep 8; alive "music video background"; shot 10-fs-video
+# full screen (Cinema) while a song plays: covers, backgrounds, stages, a language
+act fullscreen true; sleep 5; alive "Cinema"; shot 08-cinema
+for c in 0 2; do for b in 0 1 2 3 4; do set_opt FsCover $c; set_opt FsBg $b; sleep 0.8; alive "Cinema cover $c background $b"; done; done
+shot 09-cinema-record
+for st in 0 1 12 28 30 31; do set_opt FsStage $st; sleep 0.8; alive "Cinema stage $st"; done
+set_opt Lang '"tr"'; sleep 2; alive "Turkish"; shot 10-cinema-tr; set_opt Lang '""'
+set_opt FsStage 28; set_opt FsCover 2; set_opt FsBg 1
 fc0=$(cpu); sleep 10; fc1=$(cpu)
 grep "perf:" "$DIR/orbit.log" | tail -1
 echo "CPU in full screen: $(awk -v a=$fc0 -v b=$fc1 'BEGIN{printf "%.2f s in 10 s = %.2f%% of one core", b-a, (b-a)/10*100}')"
@@ -131,7 +130,7 @@ set_opt ShowGlow true; measure "Retina pixels, 60 fps, all widgets + screen glow
 set_opt ShowGlow false
 for s in 0 3 6 10 14 20 26; do set_opt LyricsStyle $s; sleep 1.5; alive "lyrics style $s at Retina size"; done
 for e in 0 1 2 3 4 5 6 7 8 9 10 11; do set_opt Effect $e; sleep 1; alive "lyrics effect $e at Retina size"; done
-set_opt Effect 1; set_opt FsKind 0; act fullscreen true; sleep 4; kill -USR1 $PID; sleep 6; alive "full screen at Retina size"
+set_opt Effect 1; act fullscreen true; sleep 4; kill -USR1 $PID; sleep 6; alive "full screen at Retina size"
 grep "perf:" "$DIR/orbit.log" | tail -1
 grep "full screen" "$DIR/orbit.log" | tail -3
 pprof_top /tmp/orbit-cpu-2.prof fullscreen
@@ -160,7 +159,7 @@ scen() {
 FPSWANT=60
 for k in ShowLyrics ShowVinyl ShowHalo ShowClock ShowWeather; do set_opt $k true; done
 set_opt FPS 60; set_opt Motion 3; set_opt Effect 1
-for st in $(seq 0 28); do scen "lyrics style $st" LyricsStyle=$st; done
+for st in $(seq 0 30); do scen "lyrics style $st" LyricsStyle=$st; done
 set_opt LyricsStyle 3
 for e in $(seq 0 11); do scen "effect $e" Effect=$e; done
 set_opt Effect 1
@@ -177,20 +176,19 @@ set_opt ShowGlow false
 scen "text size big" TextSize=90
 scen "text size small" TextSize=40
 FPSWANT=30
-set_opt FsKind 0; set_opt FsFPS 30; act fullscreen true; sleep 2
-for m in 0 1 2 3; do for b in 0 1 2 3 4 5 6; do scen "full screen $m/$b" FsMode=$m FsBg=$b; done; done
+set_opt FsFPS 30; act fullscreen true; sleep 2
+for c in 0 2; do for b in 0 1 2 3 4; do scen "Cinema cover $c, background $b" FsCover=$c FsBg=$b; done; done
+for st in 0 1 4 12 20 28 30 31; do scen "Cinema stage $st" FsStage=$st; done
+for m in 0 1 2 3 4; do scen "Cinema motion $m" Motion=$m; done
 set_opt FsFPS 60; FPSWANT=60
-scen "full screen 60 fps" FsMode=3 FsBg=1
-act fullscreen false; sleep 1
-FPSWANT=30
-set_opt FsKind 1; act fullscreen true; sleep 2
-for b in 0 1 2 3 4; do scen "desktop skin $b" SkinBg=$b; done
+scen "Cinema 60 fps" FsCover=2 FsBg=1 FsStage=12
+for l in tr ru en; do scen "Cinema language $l" Lang="\"$l\""; done
 act fullscreen false; sleep 1
 FPSWANT=60
 # song changes: new cover, new lyrics, every picture rebuilt
 for i in 1 2 3 4; do kill -USR2 $PID; scen "song change $i"; done
 # quick switching back and forth must not crash or leak
-for i in $(seq 1 40); do set_opt LyricsStyle $((i % 29)); set_opt DiscStyle $((i % 7)); set_opt HaloStyle $((i % 6)); sleep 0.15; done
+for i in $(seq 1 40); do set_opt LyricsStyle $((i % 31)); set_opt DiscStyle $((i % 7)); set_opt HaloStyle $((i % 6)); sleep 0.15; done
 alive "fast switching"
 for i in 1 2 3 4 5 6; do act fullscreen true; sleep 0.7; act fullscreen false; sleep 0.4; done
 alive "full screen in and out"

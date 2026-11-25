@@ -328,10 +328,11 @@ void ow_close(void *wp) { NSWindow *w = (__bridge_transfer NSWindow *)wp; [w ord
 
 /* ---------- dates in the user's language ---------- */
 
-int os_format_date(long long unix, int lng, char *buf, int n) {
+int os_format_date(long long unix, int lng, const char *loc, char *buf, int n) {
 	NSDateFormatter *f = [NSDateFormatter new];
-	f.locale = NSLocale.currentLocale;
-	f.dateFormat = [NSDateFormatter dateFormatFromTemplate:(lng ? @"EEEEdMMMM" : @"EEEdMMM") options:0 locale:NSLocale.currentLocale];
+	NSLocale *L = (loc && loc[0]) ? [NSLocale localeWithLocaleIdentifier:[NSString stringWithUTF8String:loc]] : NSLocale.currentLocale;
+	f.locale = L;
+	f.dateFormat = [NSDateFormatter dateFormatFromTemplate:(lng ? @"EEEEdMMMM" : @"EEEdMMM") options:0 locale:L];
 	NSString *s = [f stringFromDate:[NSDate dateWithTimeIntervalSince1970:unix]];
 	const char *u = s.UTF8String;
 	if (!u) return 0;
@@ -719,3 +720,10 @@ void ow_sprites(void *wp, int n, const OSprite *sp) {
 }
 
 long os_present_bytes(void) { return livePresentBytes; }
+
+// os_lang: the first language the user prefers ("tr-TR", "ru", "en-US"...)
+void os_lang(char *buf, int n) {
+	NSString *l = NSLocale.preferredLanguages.firstObject ?: @"en";
+	strncpy(buf, l.UTF8String ?: "en", n - 1);
+	buf[n - 1] = 0;
+}

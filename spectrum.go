@@ -22,6 +22,7 @@ type Spectrum struct {
 	win      [fftN]float64
 	edges    [nBands + 1]int
 	lastRate float64
+	wavePeak float64
 }
 
 var spectrum = &Spectrum{rate: 48000, peak: 1e-3}
@@ -153,4 +154,50 @@ func fft(a []complex128) {
 			}
 		}
 	}
+}
+
+// Wave fills out with the newest samples, started on a rising zero crossing so the trace
+// stands still on a steady tone, scaled by a slow automatic gain to about -1..1.
+// false when no sound is coming in.
+func (s *Spectrum) Wave(out []float32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := len(out)
+	if n == 0 || n > fftN/2 || time.Since(s.lastFeed) > 300*time.Millisecond {
+		for i := range out {
+			out[i] = 0
+		}
+		return false
+	}
+	search := fftN - n - 1
+	if search > 256 {
+		search = 256
+	}
+	start := (s.pos - n - search + 2*fftN) % fftN
+	off := search // no crossing found: the newest samples
+	for i := 0; i < search; i++ {
+		a, b := s.ring[(start+i)%fftN], s.ring[(start+i+1)%fftN]
+		if a <= 0 && b > 0 {
+			off = i
+			break
+		}
+	}
+	peak := 0.0
+	for i := 0; i < n; i++ {
+		v := s.ring[(start+off+i)%fftN]
+		out[i] = v
+		if a := math.Abs(float64(v)); a > peak {
+			peak = a
+		}
+	}
+	if peak > s.wavePeak {
+		s.wavePeak = s.wavePeak*0.5 + peak*0.5
+	} else {
+		s.wavePeak = s.wavePeak*0.97 + peak*0.03
+	}
+	gain := 0.9 / math.Max(s.wavePeak, 0.02)
+	for i := range out {
+		out[i] = float32(math.Max(-1.2, math.Min(1.2, float64(out[i])*gain)))
+	}
+	return true
 }

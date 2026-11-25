@@ -36,6 +36,37 @@ type Media struct {
 	offset            float64
 	modes             Modes
 	modesHold         time.Time // the user just flipped one: the player's old answer is ignored briefly
+	// 1.19.1: small differences between our clock and the player's are eased in over slewDur
+	// instead of jumping (the lyrics used to twitch back and forth every poll)
+	slewAmt float64
+	slewAt  time.Time
+	slewLen float64 // seconds this correction is spread over
+}
+
+const (
+	slewDur  = 0.6 // seconds a small correction is spread over
+	slewJump = 0.9 // a difference bigger than this is a real jump: followed at once
+)
+
+// cur: the position now, without the lyrics offset (m.mu held).
+func (m *Media) cur(now time.Time) float64 {
+	p := m.pos
+	if m.playing && !m.posAt.IsZero() {
+		p += now.Sub(m.posAt).Seconds()
+	}
+	if m.slewAmt != 0 {
+		k := now.Sub(m.slewAt).Seconds() / math.Max(slewDur, m.slewLen)
+		if k > 1 {
+			k = 1
+		}
+		p += m.slewAmt * k
+	}
+	return p
+}
+
+// fold puts the eased-in part of the correction into pos (m.mu held).
+func (m *Media) fold(now time.Time) {
+	m.pos, m.posAt, m.slewAmt = m.cur(now), now, 0
 }
 
 // Modes: shuffle and repeat as the player reports them. -1 = not known.
@@ -60,10 +91,7 @@ var media = &Media{}
 func (m *Media) Snapshot() MediaSnap {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	p := m.pos
-	if m.playing && !m.posAt.IsZero() {
-		p += time.Since(m.posAt).Seconds()
-	}
+	p := m.cur(time.Now())
 	if m.track != nil && m.track.Duration > 0 && p > m.track.Duration {
 		p = m.track.Duration
 	}
@@ -86,7 +114,7 @@ func (m *Media) SetTrack(title, artist, album string, source string) bool {
 		return false
 	}
 	m.track = &Track{Key: key, Title: title, Artist: artist, Album: album}
-	m.pos, m.posAt = 0, time.Now()
+	m.pos, m.posAt, m.slewAmt = 0, time.Now(), 0
 	m.exact = false
 	m.source = source
 	m.version++
@@ -128,8 +156,24 @@ func (m *Media) SetPosition(pos float64, playing bool) {
 			return
 		}
 		m.seekUntil = time.Time{}
+		m.pos, m.posAt, m.playing, m.exact, m.slewAmt = pos, time.Now(), playing, true, 0
+		return
 	}
-	m.pos, m.posAt, m.playing, m.exact = pos, time.Now(), playing, true
+	now := time.Now()
+	if m.exact && playing && m.playing && m.track != nil {
+		shown := m.cur(now)
+		if d := pos - shown; math.Abs(d) <= slewJump {
+			// the player's clock and ours drift by a few tens of ms each poll: ease it in
+			m.pos, m.posAt = shown, now
+			m.slewAmt, m.slewAt = 0, now
+			if math.Abs(d) > 0.015 {
+				// never backwards: time only slows down (to 30 % at least) while it catches up
+				m.slewAmt, m.slewLen = d, math.Max(slewDur, -d/0.7)
+			}
+			return
+		}
+	}
+	m.pos, m.posAt, m.playing, m.exact, m.slewAmt = pos, now, playing, true, 0
 }
 
 // Seek: the place the user jumped to, shown at once (the player catches up a moment later).
@@ -144,6 +188,7 @@ func (m *Media) Seek(pos float64) {
 	}
 	now := time.Now()
 	m.pos, m.posAt, m.seekTo, m.seekAt, m.seekUntil = pos, now, pos, now, now.Add(2500*time.Millisecond)
+	m.slewAmt = 0
 }
 
 // SetPlaying changes play state while keeping the estimated position continuous.
@@ -153,10 +198,7 @@ func (m *Media) SetPlaying(playing bool) {
 	if playing == m.playing {
 		return
 	}
-	if m.playing && !m.posAt.IsZero() {
-		m.pos += time.Since(m.posAt).Seconds()
-	}
-	m.posAt = time.Now()
+	m.fold(time.Now())
 	m.playing = playing
 }
 
@@ -267,4 +309,27 @@ func (m *Media) WantModes(shuffle, repeat int) {
 		m.modes.Repeat = repeat
 	}
 	m.modesHold = time.Now().Add(2500 * time.Millisecond)
+}
+
+// looksLikeID: a "title" that is really a hash or id (some players send the file's name, e.g.
+// 79ead9f36e7f4fc835…): 16+ hex digits / letters with no spaces.
+func looksLikeID(s string) bool {
+	s = strings.TrimSpace(s)
+	if i := strings.LastIndex(s, "."); i > 0 && len(s)-i <= 5 { // "….mp3"
+		s = s[:i]
+	}
+	if len(s) < 16 || strings.ContainsAny(s, " ") {
+		return false
+	}
+	hex := 0
+	for _, r := range s {
+		switch {
+		case r >= '0' && r <= '9', r >= 'a' && r <= 'f', r >= 'A' && r <= 'F':
+			hex++
+		case r == '-' || r == '_' || r == '.':
+		default:
+			return false
+		}
+	}
+	return hex >= 16
 }

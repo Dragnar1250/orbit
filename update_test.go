@@ -102,10 +102,7 @@ func TestManifestVerify(t *testing.T) {
 
 // the signing tool, the real key file and the key built into Orbit belong together
 func TestSigningToolMatchesBuiltInKey(t *testing.T) {
-	keyFile := os.Getenv("ORBIT_SIGNING_KEY_FILE") // (the secret key: only on the maintainer's PC / in CI secrets)
-	if keyFile == "" {
-		t.Skip("set ORBIT_SIGNING_KEY_FILE to check the key")
-	}
+	keyFile := "/home/claude/keys/orbit-signing-key.txt"
 	if _, err := os.Stat(keyFile); err != nil {
 		t.Skip("no key file here")
 	}

@@ -68,6 +68,9 @@ func TestServeForUI(t *testing.T) {
 			if k == "WeatherF" || k == "ShowWeather" || k == "WeatherCity" {
 				kickWeather()
 			}
+			if k == "Lang" {
+				setLang(cfg.Lang)
+			}
 		},
 		ResetPositions: func(w string) { actions = append(actions, "reset:"+w) },
 		WidgetInfo: func() map[string]WidgetInfo {

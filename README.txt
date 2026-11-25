@@ -1,4 +1,4 @@
-ORBIT 1.18  -  desktop music widgets for Windows 10 / 11
+ORBIT 1.21  -  desktop music widgets for Windows 10 / 11
 =============================================================
 
 Sits on your desktop (behind your windows, on top of any wallpaper - Wallpaper
@@ -8,15 +8,343 @@ Engine, Lively or a normal picture) and shows:
     vinyl with the cover as label, tonearm that moves in as the song plays,
     now playing + recently played on an arc around it
   - synced lyrics that pop up in a RANDOM spot for every line (or a fixed spot)
-    in 29 styles: Flow, Word reel, Cinematic, Kinetic, Typewriter, Neon, Subtitle,
+    in 31 styles: Flow, Word reel, Cinematic, Kinetic, Typewriter, Neon, Subtitle,
     Stack, Rise, Pop, Karaoke, Scatter, Glass, Bounce, Wave, Glitch, Decode,
-    Highlighter, Echo, Orbit, Slide, Spotlight, Rain, Swing, Split, Focus, Ink, Constellation, Bouncing
+    Highlighter, Echo, Orbit, Slide, Spotlight, Rain, Swing, Split, Focus, Ink, Constellation, Bouncing,
+    Split-flap, LED board
   - 12 text effects (glows, shadow, outline, neon, gradient, chromatic RGB split,
     long 3D shadow, hollow, soft blur, frosted glass) and 14 colour themes
   - a halo visualizer: the album cover with bars that react to the music
 
 Works with Spotify and anything in the Windows media controls. Lyrics: lrclib.net
 
+
+NEW IN 1.23.1  -  THE COVER BACKGROUND, SHARP AGAIN
+---------------------------------------------------
+  - Cinema's "Cover" background is drawn as in 1.22.4 again: straight at
+    the screen's full size, with high-quality bicubic from the sharp
+    2000 px cover - no smaller picture enlarged, no blur.
+
+NEW IN 1.22.9  -  FASTER EVERYWHERE
+-----------------------------------
+  - Emptying a big picture before drawing it went through Windows (GDI+)
+    and was by far the slowest step of the lyrics and the visualizer; it
+    is a plain memory clear now. The full-screen lyrics draw about twice
+    as fast.
+  - Pulse, Stretch and Glow (the beat's motion) no longer redraw the words:
+    the finished words are scaled and lit as they are laid on the screen,
+    every frame, so they move smoothly with the beat at no cost.
+  - Only the part of the stage that holds words is copied, glowed and
+    pushed to the screen (most of it is empty).
+  - The record's edge fade, the soft lights behind the record and the
+    visualizer are quicker still.
+  - Measured on the same test PC against 1.22.5, a frame in full screen
+    takes 25-55 % less time, depending on the effect.
+
+NEW IN 1.22.8  -  LIGHT ON THE PC
+---------------------------------
+  - The desktop widgets were heavy: the record's ambient light, the
+    visualizer's glow and its hundreds of spokes, the groove light and the
+    turning record were drawn with slow Windows (GDI+) calls 60 times a
+    second, which on a big screen kept a core busy all the time and made
+    the whole PC - the mouse too - stutter. They are drawn in Orbit's own
+    fast code now (the same as full screen): the record is about 2.5x and
+    the visualizer about 3x lighter.
+  - Orbit runs below normal priority on the desktop (normal in full
+    screen), so it never takes time from the mouse, games or other apps.
+  - It uses at most half of the PC's cores for its pictures.
+  - If a frame still takes too long (a slow PC, a 4K screen), the desktop
+    steps its frame rate down by itself (60 > 45 > 30 > 20) and back up
+    when there is room.
+  - Fixed a rare endless loop when the groove light was drawn near the
+    middle of the record.
+
+NEW IN 1.22.7  -  SMOOTH AGAIN, SMALLER LEFT SIDE
+------------------------------------------------
+  - Full screen is smooth again: 1.22.6 redrew the big lyrics on almost
+    every beat (Pulse / Stretch / Glow moved in very fine steps), which on
+    big screens took the frame rate down. Back to the light steps, and the
+    beat alone now redraws the words at most 30 times a second.
+  - The song, the time line, the buttons and "Up next" are smaller again
+    and the whole left side sits closer to the edge.
+  - "UP NEXT" in full screen is translated too.
+
+NEW IN 1.22.6  -  A SMOOTHER CINEMA
+-----------------------------------
+  - Smoother lyrics in full screen: a frame that takes a moment too long is
+    picked up at the very next refresh instead of a whole frame later (the
+    cause of the "15 fps" feeling, worst on 120/144 Hz screens). Wave and
+    LED board move at the full frame rate there, and the music-driven
+    Pulse / Stretch / Glow and the Dissolve haze move in fine steps.
+  - The "Cover" background is high quality: drawn with high-quality
+    bicubic from the sharp cover, frosted with a real soft blur - no steps
+    or blocks, however big the screen.
+  - The left side is smaller and calmer (title, artist, buttons) and sits
+    further to the left, with more room before the lyrics.
+
+NEW IN 1.22.5  -  TÜRKÇE, РУССКИЙ, AND A CALMER CINEMA
+------------------------------------------------------
+  - Languages: Settings > System > Language (at the top): English, Türkçe
+    or Русский - or "Windows language", which follows Windows. Everything
+    is translated: the settings, the tray menu, full screen (toasts and the
+    H card), the widgets, the weather, the dates and the effect names
+    (Constellation = Takımyıldız / Созвездие). The words clock speaks the
+    language too ("saat onu beş geçiyor", "пять минут одиннадцатого").
+  - Cinema's bar is simpler: a plain thin time line with a small knob, and
+    plain white buttons - no frosted pill.
+  - The "Cover" background is smooth now: the cover is blurred softly
+    instead of being blown up from a tiny picture (no more blocky look).
+  - Smoother full screen: the beat rings around the record are drawn much
+    faster, still words are drawn once and reused, spark glows are reused.
+  - "Big cover" is gone from Cinema (the cover or the record is enough);
+    if you had it, you get the cover.
+
+NEW IN 1.22.4  -  CINEMA: A NEW PLAYER, A BIGGER SKY
+----------------------------------------------------
+  - The controls on the left are redrawn: they sit on one frosted bar; the
+    play button is a glowing disc in the album's colour; previous / next
+    have rounded shapes; shuffle and repeat are drawn icons of the same
+    weight (in the album's colour, with a dot, when on).
+  - The time line is a little thicker, filled from the album's colour to
+    white, with a knob that is always there and grows under the mouse.
+  - Constellation in full screen: its words, stars and lines a size up.
+  - (The test mode can now make up a beat, so what moves with the music is
+    tested too.)
+
+NEW IN 1.22.3  -  CLEANER WORDS, SHARPER PICTURES, LIGHTER FULL SCREEN
+------------------------------------------------------------------------
+  - Scatter: words never land on top of each other any more - each one is
+    placed by its real size and tilt where it touches no other word, and a
+    new line keeps clear of the one fading out. (Desktop widget and full
+    screen.) Its layout is worked out once per line, not every frame.
+  - Constellation in the desktop lyrics widget: a more compact sky with
+    words about 1.6 times bigger and bigger stars; labels stay inside it.
+  - Vinyl widget: the bars beside NOW PLAYING move with the music (they sway
+    on their own when there is no sound to follow), and every few seconds a
+    soft light runs across the words.
+  - Covers: drawn with the best filter and no fringe at their edges; round
+    corners and round record labels have smooth edges (they were cut with
+    hard, stair-stepped edges); the big full-screen cover gets a touch of
+    sharpening after it is resized.
+  - Full screen uses less memory: the picture kept for cross-fades exists
+    only around a song change, the old lyrics line is kept in reused memory
+    instead of a new bitmap every line, and closing full screen gives back
+    the outlines of its big words.
+
+NEW IN 1.22.2  -  CINEMA: A TONEARM, STEADIER FRAMES
+----------------------------------------------------
+  - A tonearm on the full-screen record: it swings out to its rest when the
+    music stops and comes back when it starts, lifting while it travels and
+    settling gently into the groove, which it follows inwards as the song
+    plays. It also lifts while records change. Silver, Black or Gold
+    (A, or Settings > Cinema), or none.
+  - Fixed: after a song change the cover / record could move to the middle
+    and stay there (a song without lyrics). With lyrics on, the left side now
+    always stays put; such a song shows "No lyrics for this song" or
+    "Instrumental" on the right.
+  - Frames now come in step with the screen's refresh (the display driver's
+    own signal) and animations use that moment, so every step is the same
+    size - no more uneven steps now and then. New choice in Settings >
+    Cinema: "Screen's rate" draws a frame on every refresh of a 120/144 Hz
+    screen.
+  - Faster: each word's outline is made once instead of every frame, the
+    next lyrics line is got ready while the current one is sung (no more
+    hitch when a line starts), the LED board is about twice as light, and
+    the glow skips the dark parts of the stage.
+  - Q writes how even the frames are (median / 95% / worst) to orbit.log.
+
+NEW IN 1.22.1  -  CINEMA: THE RECORD WORKS, EVERY EFFECT FILLS THE STAGE
+-------------------------------------------------------------------------
+  - Fixed: Vinyl in Cinema froze on its first frame (black screen, then
+    "not responding"). It turns smoothly now, and the settings lock can no
+    longer wait for itself anywhere in Cinema.
+  - The record turns on every core of the processor instead of through
+    GDI+: several times faster, sharper, and big. It uses the big room on
+    the left, without the tonearm, and fades in at the edges when records
+    change instead of being cut.
+  - Every lyrics effect now fills the right half like Scatter and
+    Constellation: each line is sized to the stage when it starts (short
+    lines big, long ones over a few rows) and keeps that size while sung.
+    Flow, Split-flap and the LED board are bigger too; Orbit's arc stays
+    inside. The desktop lyrics widget is unchanged.
+  - Flowing colours is about three times lighter; the layout no longer
+    jumps to the middle for a moment when the song changes; the old line
+    gets out of the way faster.
+  - Q also writes what each part of a frame costs to orbit.log.
+  - Stress-tested for about an hour: every effect, record, background, key,
+    at 1366x768, 1080p, 1440p and 4K - no crash, no hang, no memory growth.
+
+NEW IN 1.22  -  CINEMA: A BIGGER STAGE, REAL GLOW, A TURNING RECORD
+--------------------------------------------------------------------
+  - The lyrics stage takes the whole right half. Scatter and Constellation
+    spread over all of it, every effect is about 45% bigger, and a line
+    that ends fades and lifts away while the next one comes in.
+  - Sharper words: Soft and Strong glow are now real light (a bloom drawn
+    under the letters) instead of the old blurry halo, so the text itself
+    stays crisp.
+  - Backgrounds (B, or Settings > Cinema): Cover colours, Cover (the cover
+    itself, darkened), Gradient, Dark, Flowing colours (they drift slowly).
+  - Left side (V): Cover, Big cover (just the album art, as large as fits),
+    or Vinyl - a turning record with the Vinyl widget's looks and effects
+    (CD, worn, sparkles...) and the same record change when the song
+    changes. R picks the record: like the Vinyl widget, or its own.
+  - The lyrics on the desktop widget are unchanged - only Cinema's are new.
+  - Q shows the time a frame takes, if anything feels slow.
+
+NEW IN 1.21  -  CINEMA ONLY, A LYRICS STAGE, SMOOTH
+---------------------------------------------------
+  - Full screen is now Cinema alone: the Music display and the Desktop skin
+    are gone (with the music-video background and the search bar they had).
+  - The right half is a lyrics STAGE, from under the clock almost to the
+    bottom. Pick the effect with Left / Right in full screen (or Settings >
+    Cinema): Lines (Apple-style, line by line) or any of the 31 lyric styles -
+    Scatter (the default) spreads every line's words over the whole stage,
+    Kinetic, Karaoke, Constellation, Bouncing, Glitch, Split-flap, LED board...
+    Font, size (Up / Down), text effect (E) and colours (T) are Cinema's own.
+  - Previous / next song: the buttons, or Ctrl + Left / Right.
+  - Smooth: it no longer stutters at ~15 fps. Lyrics were dimmed with a GDI+
+    colour matrix - very slow; they are now blended by Orbit itself (8 lines
+    at 1440p in about 2 ms, on all cores), and the stage redraws only where
+    its words were and are. Cinema runs at 60 fps (Settings: 30 to save power).
+  - Messages show above the cover; the left column is unchanged.
+
+NEW IN 1.20  -  CINEMA: A NEW FULL SCREEN
+-----------------------------------------
+  Full screen (Ctrl+Alt+F) now opens in Cinema - calm, sharp and smooth:
+  - The cover, large and sharp (the 2000 px one when the player's is small),
+    with a deep soft shadow and a faint glow in its own colour.
+  - Under it the song, the artist and the album; a thin time line (it
+    thickens under the mouse - click or drag to jump); shuffle, previous,
+    a white play / pause disc, next, repeat; and "Up next" from your
+    Spotify queue (click it to skip there).
+  - On the right the lyrics, line by line: the line being sung is bright
+    and fills up word by word, the others are soft and fade toward the
+    edges, and the lines glide up as the song goes on. Long pauses show
+    three dots that fill until the singing starts again. No lyrics: the
+    cover moves to the middle.
+  - The background is the cover's own colours, blurred into soft light,
+    darker where the text sits, with a fine grain so it never bands.
+  - A small clock top right. No key bars on screen: H shows a card with
+    all the keys. Song changes cross-fade.
+  - Fast: Cinema is an ordinary window (the old views are see-through
+    layered windows - Windows blended the whole 2560x1440 picture on
+    every frame, that was the lag). Everything that stands still is drawn
+    once per song; each frame only the lyrics, the time line and the
+    controls are redrawn and copied to the screen. It doesn't listen to
+    the sound at all, and nearly rests while paused. Q shows the time a
+    frame takes.
+  - Keys: Space play/pause, Left/Right previous/next, Up/Down lyrics size,
+    L lyrics, C clock, H keys, D the other two views, S settings, mouse
+    wheel volume, Esc / double-click leaves.
+  - Settings > Full screen: Cinema / Music display / Desktop skin. Lyrics
+    font, size and bold come from "Lyrics look" there.
+  Vinyl
+  - The playing song on the wheel has no box any more: its cover is bigger
+    and lifted on a soft shadow with a glow in the album's colour, three
+    little playing bars sit before NOW PLAYING, and the other songs step
+    back (dimmer).
+
+NEW IN 1.19.4  -  A QUIETER, ALBUM-TINTED HIGHLIGHT
+---------------------------------------------------
+  - The playing song on the wheel sits on quiet glass instead of an orange
+    box: a faint album-coloured wash, a hairline edge, a thin highlight
+    along the top and a soft shadow; its cover floats a little above it.
+  - NOW PLAYING / UP NEXT / PLAYED and the playing song's artist take the
+    album's colour - softened so they always read on the dark - and change
+    with every cover.
+  - Titles: Segoe UI Semibold for the playing song, regular for the rest.
+
+NEW IN 1.19.3  -  A NEW SONG WHEEL, SHARP AT ANY SIZE
+-----------------------------------------------------
+  - The song wheel puts the song playing in the MIDDLE, highlighted: a bigger
+    cover, bright bold title, a soft glowing pill behind it. Above it the
+    next 2 songs (Spotify queue), below it the 2 that played - dimmer. The
+    order is the same in every corner. (Vinyl > "Songs around it on the
+    wheel": half above, half below; 4 = 2 and 2.) Not connected to Spotify:
+    the top slot says so instead of guessing.
+  - Sharp when small: the wheel's text is drawn grid-fitted (crisp edges),
+    never smaller than a readable size, not tilted on a small wheel, and
+    placed on whole pixels; rows spread out when the wheel is small so
+    nothing overlaps. A small record turns with the sharper filter.
+  - "Recently played" (Vinyl > View) keeps the old wheel.
+
+NEW IN 1.19.2  -  UP NEXT ON THE RECORD, A FLOWING CHANGE, TIGHTER LYRICS
+-------------------------------------------------------------------------
+  Vinyl
+  - The song wheel shows what plays NEXT ("Up next" under the playing
+    song) - read from your real Spotify queue, refreshed when the song
+    changes and every 20 s. Windows only tells apps what plays now, so this
+    needs your Spotify account connected once (Full screen > Desktop skin >
+    Spotify queue; Spotify allows it on Premium). Not connected: the wheel
+    shows what you played, as before. Vinyl > View: Up next / Recently played.
+  - Lift & drop flows: the new record starts coming down while the old one
+    is still fading out (as soon as its cover is there) - no empty pause.
+    The new record speeds up gently, the needle swings on as it settles.
+  - Smoother: the record change no longer stutters at its start. The small
+    cover copy for the song list is saved a few seconds later, the CD
+    rainbow is made once per size instead of every song, the new record
+    is drawn only once (when its cover is there), and during the change only
+    the part of the window the records move over is redrawn.
+  - Skipping several songs quickly mid-change just waits for the newest one.
+  Lyrics
+  - Steadier timing: the player's position used to be applied with a small
+    jump twice a second, so words could twitch back and forth. Small
+    differences are now eased in over 0.6 s (time only slows, never runs
+    backwards); real jumps (seeking) are still followed at once.
+  - Lyrics you already had show the moment the song starts (it used to wait
+    1.2 s for the song length first).
+  - With Spotify connected, the next two songs' lyrics are fetched ahead,
+    so they are there from the first line.
+  - Still a little early or late with your speakers / Bluetooth headphones?
+    Lyrics > Lyrics offset moves them in 0.1 s steps.
+
+NEW IN 1.19.1  -  A SMOOTHER RECORD CHANGE
+------------------------------------------
+  - New default "Lift & drop": when the song changes the needle lifts, the
+    record slows down, lifts off (its shadow falls away) and fades out toward
+    the corner; the next record comes down, fades in, settles with a soft
+    little landing and speeds up again, then the needle drops back on.
+  - The change now WAITS for the next song's cover (up to about 2 seconds)
+    before the new record appears - no more wrong cover or the note sign
+    flashing on the new record.
+  - Fixed: the Sleeve change could show the cover of an earlier song (two
+    songs with the same cover number shared one sleeve).
+  - Choose the look in Vinyl > Behaviour: Lift & drop or Sleeve.
+
+NEW IN 1.19  -  CD, SLEEVES, SCRATCHING, NEW VISUALIZERS AND BOARD LYRICS
+-------------------------------------------------------------------------
+  Vinyl
+  - 4 new records: CD (holographic) - a silver disc whose rainbow drifts as
+    it turns and flashes on the bass; Neon - black vinyl with glowing rings;
+    Two-tone - half and half; Glow in the dark - phosphor green.
+  - Change records with the song: when the song changes the needle lifts,
+    the album sleeve slides over the record and away with it, the next
+    song's sleeve slides in and off again, leaving the new record, and the
+    needle drops back on. (Vinyl > Behaviour, on by default.)
+  - Old, well-played record: dust and fine scratches on the record and tiny
+    sparkles where the needle runs over them. (Vinyl > Effects, off by default.)
+  - Scratch: hold the record on your desktop and turn it by hand - the song
+    goes forward or back with it and the time shows on the record. One full
+    turn = 6 seconds of the song (2-30, Vinyl > Behaviour). A click without
+    turning still plays / pauses. To MOVE the record, drag it by the song
+    wheel / card, or use arrange mode (Ctrl+Alt+E). Needs Windows media
+    controls (Settings > Music) like the time line in full screen.
+  Visualizer
+  - Particles: particles in the album's own colours burst out on every kick
+    and spring back to their ring (choose "Album colours" for the cover's
+    colours, other themes use their palette).
+  - Oscilloscope: the real waveform as a green phosphor trace on a little
+    CRT, with afterglow, flicker and scanlines.
+  - Liquid: a soft, glossy blob around the cover - the bass makes the big
+    slow bulges, the highs the small quick ones, and it swells on the kick.
+  Lyrics
+  - Split-flap: a departures board. Every letter sits on its own tile and
+    flips through other letters before it settles, left to right.
+  - LED board: the line scrolls across a dot-matrix panel so the word being
+    sung stays in view; sung words are lit, the current word brightest.
+
+  Note: this exe is not signed with the update key, so Automatic updates
+  won't offer it - just start the new Orbit.exe (it closes the old one).
 
 NEW IN 1.18  -  SEARCH WITH SUGGESTIONS, SHUFFLE, AUTOMATIC UPDATES
 --------------------------------------------------------------------
@@ -378,6 +706,8 @@ MOVING AND RESIZING WITH THE MOUSE
     - right-click a widget for the menu
     - click "Done" in the bar at the top of the screen (or Ctrl+Alt+E) to finish
   Outside arrange mode: scroll over a widget on the desktop to resize it.
+  The record: with Scratch on, dragging the record itself turns it - move
+  it by its song wheel / card, or in arrange mode.
   Also: tray (right-click) -> Move & resize, and Settings -> Layout sliders.
 
 

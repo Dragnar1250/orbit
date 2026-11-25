@@ -52,6 +52,7 @@ type Widget struct {
 	clickThrough bool
 	dragging     bool
 	offscreen    bool
+	frames       int // pictures made (full screen's offscreen widgets: "has it drawn again?")
 	ox, oy       int
 	// the soft layer under the main picture (see softBegin) and the turning label
 	softK     float64 // its size per point (0: none)
@@ -99,7 +100,10 @@ func (w *Widget) resize(width, height int) {
 	case w.offscreen:
 		w.canvas = newCanvas(width, height)
 	default:
-		w.canvas = newSurfaceCanvas(width, height)
+		// plain memory, rows exactly w pixels apart (an IOSurface's rows are padded): the Go pixel
+		// work shared with Windows (rotating records, glows, rings) draws straight into it; it is
+		// copied to the window's layer when shown
+		w.canvas = newCanvas(width, height)
 	}
 	w.w, w.h = width, height
 	if w.canvas != nil {
@@ -238,6 +242,7 @@ func (w *Widget) level() int {
 }
 
 func (w *Widget) present() {
+	w.frames++
 	if w.offscreen {
 		w.visible = w.canvas != nil
 		return
@@ -440,14 +445,15 @@ var lastClick struct {
 	up   bool
 }
 
-func localDate(t time.Time, picture string) string { return "" }
-
-func formatDate(t time.Time, long bool) string {
+// localDate: the date in Orbit's language ("Çarşamba 25 Kasım"); picture "dddd…" is the long form.
+func localDate(t time.Time, picture string) string {
 	var buf [128]C.char
-	if n := C.os_format_date(C.longlong(t.Unix()), C.int(b2i(long)), &buf[0], 128); n > 0 {
+	loc := C.CString(langLocale())
+	defer C.free(unsafe.Pointer(loc))
+	if n := C.os_format_date(C.longlong(t.Unix()), C.int(b2i(strings.HasPrefix(picture, "dddd"))), loc, &buf[0], 128); n > 0 {
 		return C.GoString(&buf[0])
 	}
-	return englishDate(t, long)
+	return ""
 }
 
 func trayBalloon(title, text string) { logf("%s: %s", title, text) }
@@ -469,6 +475,7 @@ func main() {
 		logf("closed %d other Orbit(s) — only one runs at a time", int(n))
 	}
 	loadConfig()
+	setLang(cfg.Lang)
 	media.SetOffset(cfg.OffsetSec)
 	icon := C.CString(menuIconPath())
 	C.os_run(icon) // → goStarted, then runs until Quit
@@ -495,8 +502,8 @@ func goStarted() {
 	hooks.Flash = func(name string) { flash(name); requestRedraw() }
 	hooks.SetOpacity = setOpacity
 	hooks.FormatDate = formatDate
-	hooks.OpenSettings = openSettings
 	hooks.Fullscreen = func(open bool) { setFullscreen(open) }
+	hooks.OpenSettings = func() { runOnUI(openSettings) }
 	if srv, err := startSettingsServer(""); err == nil {
 		settingsSrv = srv
 		logf("settings window on 127.0.0.1:%d", srv.port)
@@ -520,6 +527,18 @@ func goStarted() {
 		go macMediaLoop()
 		go audioLoop()
 	}
+	systemLang = func() string {
+		var buf [16]C.char
+		C.os_lang(&buf[0], 16)
+		switch l := C.GoString(&buf[0]); {
+		case strings.HasPrefix(l, "tr"):
+			return "tr"
+		case strings.HasPrefix(l, "ru"):
+			return "ru"
+		}
+		return "en"
+	}
+	setLang(cfg.Lang)
 	go weatherLoop(func() (string, float64, float64, bool, bool) {
 		var place string
 		var lat, lon float64
@@ -556,7 +575,13 @@ func goTick() {
 	snap := media.Snapshot()
 	// the mouse: hover toolbar and dragging (the Mac has no global hook; the pointer is read here)
 	pt := cursorPos()
-	if drag != nil {
+	if vinyl != nil && vinyl.scr.on {
+		if C.os_mouse_down() == 0 {
+			vinyl.endScratch()
+		} else if pt != macLastPt {
+			vinyl.scratchMove(pt)
+		}
+	} else if drag != nil {
 		dragMove(false)
 		if C.os_mouse_down() == 0 {
 			endDrag()
@@ -576,7 +601,8 @@ func goTick() {
 		perf.report(now, true)
 		needRedraw, layoutDirty, styleDirty = false, false, false
 		saveConfigIfDue(false)
-		C.os_set_rate(C.double(max(5, atomic.LoadInt32(&fpsNow))))
+		atomic.StoreInt32(&fpsNow, int32(fsRate()))
+		C.os_set_rate(C.double(fsRate()))
 		return
 	}
 	if snap.Playing {
@@ -585,6 +611,7 @@ func goTick() {
 	ui := uiScale()
 	perf.tick(now)
 	t := time.Now()
+	deskT0 := t
 	vinyl.Update(now, snap, bands, bass, ui)
 	t = perf.add(0, t)
 	halo.Update(now, snap, bands, bass, active, ui)
@@ -597,6 +624,7 @@ func goTick() {
 	t = perf.add(4, t)
 	glowView.Update(now, snap, bands, bass, ui)
 	perf.add(5, t)
+	deskBudget(time.Since(deskT0))
 	perf.report(now, snap.Playing)
 	updateBanner()
 	if layoutDirty {
@@ -661,15 +689,26 @@ func goWidgetMouse(id C.int, kind C.int, delta C.int) {
 				return
 			}
 		}
+		// hold the record itself and turn it to scratch (the grip still resizes, the song wheel /
+		// card still moves it, and arrange mode always moves it)
+		if kind == 1 && !editMode && w.name == "vinyl" && w.name == hoverName && vinyl != nil && vinyl.w == w &&
+			hoverCorner(w) == 0 && vinyl.scratchHit(cursorPos()) {
+			vinyl.beginScratch(cursorPos())
+			return
+		}
 		if (editMode || w.name == hoverName) && w.movable {
 			beginDrag(w)
 		}
 	case 2:
-		if drag != nil && drag.w == w {
+		if vinyl != nil && vinyl.w == w && vinyl.scr.on {
+			vinyl.scratchMove(cursorPos())
+		} else if drag != nil && drag.w == w {
 			dragMove(false)
 		}
 	case 3:
-		if drag != nil && drag.w == w {
+		if vinyl != nil && vinyl.w == w && vinyl.scr.on {
+			vinyl.endScratch()
+		} else if drag != nil && drag.w == w {
 			endDrag()
 		}
 	case 4:
@@ -734,6 +773,10 @@ func settingsChanged(key string) {
 		kickWeather()
 	case "VinylCorner", "TextSize", "ShowList", "LyricsPlace":
 		layoutDirty = true
+	case "Lang":
+		setLang(cfg.Lang)
+		layoutDirty = true
+		bannerSig = ""
 	}
 	saveConfigSoon()
 	styleDirty = true
@@ -819,13 +862,16 @@ var menuWidgets = []struct {
 func buildMenu() {
 	C.os_menu_clear()
 	add := func(title string, tag int, checked, enabled bool) {
+		if tag != 0 {
+			title = T(title)
+		}
 		s := C.CString(title)
 		C.os_menu_add(s, C.int(tag), C.int(b2i(checked)), C.int(b2i(enabled)))
 		C.free(unsafe.Pointer(s))
 	}
 	sep := func() { add("", -1, false, false) }
 	snap := media.Snapshot()
-	now := "Nothing playing"
+	now := T("Nothing playing")
 	if snap.Track != nil {
 		now = snap.Track.Title + " — " + snap.Track.Artist
 	}
@@ -1097,7 +1143,7 @@ func (p *perfStats) report(now time.Time, playing bool) {
 		var ms runtime.MemStats
 		runtime.ReadMemStats(&ms)
 		mb := func(b C.long) float64 { return float64(b) / (1 << 20) }
-		out += fmt.Sprintf(" a frame · memory: Go %.0f MB, %d canvases %.0f MB, surfaces %.0f+%.0f MB, %d pictures %.0f MB, %d words %.0f MB", float64(ms.HeapInuse)/(1<<20), lv[0], mb(lv[1]), mb(lv[2]), mb(C.os_present_bytes()), lv[3], mb(lv[4]), len(sprites), float64(spriteBytes)/(1<<20))
+		out += fmt.Sprintf(" a frame · memory: Go %.0f MB, %d canvases %.0f MB, surfaces %.0f+%.0f MB, %d pictures %.0f MB", float64(ms.HeapInuse)/(1<<20), lv[0], mb(lv[1]), mb(lv[2]), mb(C.os_present_bytes()), lv[3], mb(lv[4]))
 		logf("%s", out)
 	} else {
 		var secs C.double

@@ -114,21 +114,10 @@ type rectI struct{ L, T, R, B int }
 
 func (a rectI) overlaps(b rectI) bool { return a.L < b.R && b.L < a.R && a.T < b.B && b.T < a.B }
 
-func (a rectI) overlapArea(b rectI) int {
-	w, h := min(a.R, b.R)-max(a.L, b.L), min(a.B, b.B)-max(a.T, b.T)
-	if w <= 0 || h <= 0 {
-		return 0
-	}
-	return w * h
-}
-
 // randomSpot picks a top-left for a w×h box inside area, avoiding the given rects and the last spot.
-// When no spot is free (big lyrics, a crowded screen) it takes the one that covers the least —
-// not just the fewest widgets — so the words land beside a widget, not on its text.
 func randomSpot(r *rand.Rand, area rectI, w, h int, avoid []rectI, last [2]int) (int, int) {
-	bestX, bestY, bestScore := area.L, area.T, math.Inf(-1)
-	boxArea := float64(max(1, w*h))
-	for i := 0; i < 90; i++ {
+	bestX, bestY, bestScore := area.L, area.T, -1.0
+	for i := 0; i < 40; i++ {
 		maxX, maxY := area.R-w, area.B-h
 		if maxX < area.L {
 			maxX = area.L
@@ -139,18 +128,19 @@ func randomSpot(r *rand.Rand, area rectI, w, h int, avoid []rectI, last [2]int) 
 		x := area.L + r.Intn(maxX-area.L+1)
 		y := area.T + r.Intn(maxY-area.T+1)
 		box := rectI{x, y, x + w, y + h}
-		covered := 0
+		score := 1.0
 		for _, a := range avoid {
-			covered += box.overlapArea(a)
+			if box.overlaps(a) {
+				score -= 1
+			}
 		}
-		score := 1 - 3*math.Min(1, float64(covered)/boxArea)
 		// prefer spots away from the previous line so it feels random, not jittery
 		dist := math.Hypot(float64(x-last[0]), float64(y-last[1]))
 		score += math.Min(1, dist/float64(area.R-area.L+1)*3) * 0.5
 		if score > bestScore {
 			bestX, bestY, bestScore = x, y, score
 		}
-		if covered == 0 && score >= 1.45 {
+		if score >= 1.45 {
 			break
 		}
 	}
@@ -478,4 +468,133 @@ func skyChunks(n, k int) [][2]int {
 		out[i] = [2]int{i * n / k, (i + 1) * n / k}
 	}
 	return out
+}
+
+// scatterPlace puts words of the given sizes (at scale 1: width, height) in a W×H box at random
+// spots that never overlap: each word gets a random size and tilt, then the spot — of many tried
+// — that touches no other word and lies farthest from them. If the words can't all fit, they are
+// made smaller together (never on top of each other). Same seed, same sizes: same answer.
+func scatterPlace(sizes [][2]float64, seed int64, W, H float64) []scatterSpot {
+	return scatterPlaceAvoid(sizes, seed, W, H, nil)
+}
+
+// scatterBoxes: the room each placed word takes (centre x, y, half width, half height) — what
+// the next line should keep clear of while this one fades out.
+func scatterBoxes(sizes [][2]float64, spots []scatterSpot) [][4]float64 {
+	out := make([][4]float64, 0, len(spots))
+	for i, sp := range spots {
+		if i >= len(sizes) {
+			break
+		}
+		hw, hh := scatterHalf(sizes[i], sp.Scale, sp.Rot)
+		out = append(out, [4]float64{sp.X, sp.Y, hw, hh})
+	}
+	return out
+}
+
+func scatterHalf(s [2]float64, sc, rot float64) (float64, float64) {
+	th := math.Abs(rot) * math.Pi / 180
+	w, h := s[0]*sc, s[1]*sc*0.82 // (a line's height has room above and below the letters)
+	return (w*math.Cos(th)+h*math.Sin(th))/2 + s[1]*sc*0.08, (w*math.Sin(th)+h*math.Cos(th))/2 + s[1]*sc*0.06
+}
+
+// scatterPlaceAvoid is scatterPlace that also keeps clear of the given boxes (the line before,
+// still fading out) — when there is room; if not, the words come first.
+func scatterPlaceAvoid(sizes [][2]float64, seed int64, W, H float64, avoid [][4]float64) []scatterSpot {
+	n := len(sizes)
+	if n == 0 {
+		return nil
+	}
+	if !(W >= 1) {
+		W = 1
+	}
+	if !(H >= 1) {
+		H = 1
+	}
+	r := rand.New(rand.NewSource(seed))
+	scale := make([]float64, n)
+	rot := make([]float64, n)
+	area := 0.0
+	for i, s := range sizes {
+		scale[i] = 0.62 + r.Float64()*0.55
+		rot[i] = (r.Float64() - 0.5) * 14
+		area += s[0] * s[1] * scale[i] * scale[i]
+	}
+	// everything together may cover at most about half the box
+	g := math.Min(1, math.Sqrt(0.46*W*H/math.Max(area, 1)))
+	g0 := g
+	type box struct{ x, y, hw, hh float64 }
+	for attempt := 0; ; attempt++ {
+		out := make([]scatterSpot, n)
+		placed := make([]box, 0, n)
+		ok := true
+		rr := rand.New(rand.NewSource(seed*31 + int64(attempt)))
+		for i, s := range sizes {
+			sc := scale[i] * g
+			hw, hh := scatterHalf(s, sc, rot[i]) // the box it needs when tilted, plus a little air
+			if 2*hw > W {                        // a word wider than the box: just smaller
+				k := W / (2 * hw)
+				sc, hw, hh = sc*k, hw*k, hh*k
+			}
+			best, bestD := box{W / 2, H / 2, hw, hh}, -1.0
+			for t := 0; t < 90; t++ {
+				c := box{hw + rr.Float64()*math.Max(0, W-2*hw), hh + rr.Float64()*math.Max(0, H-2*hh), hw, hh}
+				d := math.Inf(1)
+				clash := false
+				for _, a := range avoid { // the old line, as long as there's room for it
+					if attempt < 3 && math.Abs(c.x-a[0]) < c.hw+a[2] && math.Abs(c.y-a[1]) < c.hh+a[3] {
+						clash = true
+						break
+					}
+				}
+				for _, p := range placed {
+					if clash {
+						break
+					}
+					gx := math.Abs(c.x-p.x) - c.hw - p.hw
+					gy := math.Abs(c.y-p.y) - c.hh - p.hh
+					if gx < 0 && gy < 0 {
+						clash = true
+						break
+					}
+					d = math.Min(d, math.Max(gx, gy))
+				}
+				if clash {
+					continue
+				}
+				if len(placed) == 0 {
+					d = -math.Hypot(c.x-W/2, c.y-H/2) // the first word: near the middle
+				}
+				if d > bestD || bestD == -1 {
+					best, bestD = c, d
+				}
+			}
+			if bestD == -1 && len(placed) > 0 {
+				ok = false
+				break
+			}
+			placed = append(placed, best)
+			out[i] = scatterSpot{X: best.x, Y: best.y, Scale: sc, Rot: rot[i]}
+		}
+		if ok || attempt >= 12 {
+			if !ok { // (can't happen with sane sizes) one per row, all of them in the box
+				for i := range out {
+					out[i] = scatterSpot{X: W / 2, Y: (float64(i) + 0.5) * H / float64(n), Scale: math.Min(g, H/float64(n)/math.Max(1, sizes[i][1])), Rot: 0}
+				}
+			}
+			return out
+		}
+		if attempt == 2 { // no room beside the old line: forget it, back to full size
+			g = g0
+		} else {
+			g *= 0.9 // didn't fit: all a little smaller, try again
+		}
+	}
+}
+
+func b2f(b bool) float64 {
+	if b {
+		return 1
+	}
+	return 0
 }

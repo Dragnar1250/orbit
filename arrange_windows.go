@@ -106,21 +106,39 @@ func widgetMsg(w *Widget, msg uint32, wp, lp uintptr) (uintptr, bool) {
 				return 0, true
 			}
 		}
+		// 1.19: hold the record itself and turn it to scratch (the grip still resizes, the
+		// song wheel / card still moves it, and arrange mode always moves it)
+		if !editMode && w.name == "vinyl" && w.name == hoverName && vinyl != nil && vinyl.w == w &&
+			hoverCorner(w) == 0 && vinyl.scratchHit(cursorPos()) {
+			vinyl.beginScratch(cursorPos())
+			return 0, true
+		}
 		if editMode || w.name == hoverName {
 			beginDrag(w)
 			return 0, true
 		}
 	case WM_MOUSEMOVE:
+		if vinyl != nil && vinyl.w == w && vinyl.scr.on {
+			vinyl.scratchMove(cursorPos())
+			return 0, true
+		}
 		if drag != nil && drag.w == w {
 			dragMove(false)
 			return 0, true
 		}
 	case WM_LBUTTONUP:
+		if vinyl != nil && vinyl.w == w && vinyl.scr.on {
+			vinyl.endScratch()
+			return 0, true
+		}
 		if drag != nil && drag.w == w {
 			endDrag()
 			return 0, true
 		}
 	case WM_CAPTURECHANGED:
+		if vinyl != nil && vinyl.w == w && vinyl.scr.on { // lost the mouse: keep where the record is
+			vinyl.endScratch()
+		}
 		if drag != nil && drag.w == w { // capture lost (another window popped up): keep where it is
 			drag = nil
 			saveConfigSoon()

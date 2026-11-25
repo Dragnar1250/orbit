@@ -69,3 +69,7 @@ void *og_surface_show(OG *g);
 void og_surface_next(OG *g);
 void og_live(long *out);
 void *og_cgimage_crop(OG *g, int *r);
+void og_get_transform(OG *g, float *m);
+void og_set_transform(OG *g, const float *m);
+void og_path_lines(OPath *p, const float *xy, int n, int closed);
+void og_path_close(OPath *p);

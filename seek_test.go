@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -69,7 +70,7 @@ func TestSpotifySettingsSafety(t *testing.T) {
 	if c.setField("SpotifyRefresh", json.RawMessage(`"evil"`)) == nil || c.SpotifyRefresh != "SECRET" {
 		t.Fatal("the page must not set the sign-in")
 	}
-	if err := c.setField("SkinGlass", json.RawMessage(`0.5`)); err != nil || c.SpotifyRefresh != "SECRET" {
+	if err := c.setField("FsTextSize", json.RawMessage(`70`)); err != nil || c.SpotifyRefresh != "SECRET" {
 		t.Fatal("other settings must keep the sign-in")
 	}
 	if err := c.setField("SpotifyClientID", json.RawMessage(`"abcdef0123456789abcdef0123456789"`)); err != nil || c.SpotifyRefresh != "SECRET" {
@@ -92,7 +93,7 @@ func TestSpotifySettingsSafety(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := http.Get("http://127.0.0.1:" + itoa(srv.port) + "/api/state?t=" + srv.token)
+	r, err := http.Get("http://127.0.0.1:" + fmt.Sprint(srv.port) + "/api/state?t=" + srv.token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +110,7 @@ func TestSpotifySettingsSafety(t *testing.T) {
 	}
 	// disconnect
 	body := strings.NewReader(`{"name":"spotifyDisconnect","value":true}`)
-	if r, _ := http.Post("http://127.0.0.1:"+itoa(srv.port)+"/api/action?t="+srv.token, "application/json", body); r.StatusCode != 200 {
+	if r, _ := http.Post("http://127.0.0.1:"+fmt.Sprint(srv.port)+"/api/action?t="+srv.token, "application/json", body); r.StatusCode != 200 {
 		t.Fatal("disconnect")
 	}
 	if cfg.SpotifyRefresh != "" || cfg.SpotifyClientID == "" {

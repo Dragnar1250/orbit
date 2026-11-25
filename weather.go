@@ -419,3 +419,72 @@ func weatherBox(style int, k float64) (int, int) {
 	}
 	return int(380 * k), int(160 * k)
 }
+
+// clockWordsIn: the words clock in a language: a small lead ("it's"), a line
+// above the hour, the hour in big, and a line under it.
+//
+//	en: it's · twenty-five to · twelve
+//	tr: saat · on bire · yirmi beş var      (saat onu beş geçiyor, saat on buçuk)
+//	ru: сейчас · без двадцати пяти · двенадцать   (пять минут одиннадцатого, половина первого)
+func clockWordsIn(code string, h, m int) (its, top, hour, after string) {
+	m = (m + 2) / 5 * 5
+	if m == 60 {
+		m, h = 0, h+1
+	}
+	h12 := (h%12+12)%12 + 0
+	if h12 == 0 {
+		h12 = 12
+	}
+	next := h12%12 + 1
+	switch code {
+	case "tr":
+		card := []string{"", "bir", "iki", "üç", "dört", "beş", "altı", "yedi", "sekiz", "dokuz", "on", "on bir", "on iki"}
+		acc := []string{"", "biri", "ikiyi", "üçü", "dördü", "beşi", "altıyı", "yediyi", "sekizi", "dokuzu", "onu", "on biri", "on ikiyi"}
+		dat := []string{"", "bire", "ikiye", "üçe", "dörde", "beşe", "altıya", "yediye", "sekize", "dokuza", "ona", "on bire", "on ikiye"}
+		mins := map[int]string{5: "beş", 10: "on", 15: "çeyrek", 20: "yirmi", 25: "yirmi beş"}
+		its = "saat"
+		switch {
+		case m == 0:
+			hour = card[h12]
+		case m == 30:
+			hour, after = card[h12], "buçuk"
+		case m < 30:
+			hour, after = acc[h12], mins[m]+" geçiyor"
+		default:
+			hour, after = dat[next], mins[60-m]+" var"
+		}
+		return
+	case "ru":
+		card := []string{"", "час", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять", "десять", "одиннадцать", "двенадцать"}
+		ord := []string{"", "первого", "второго", "третьего", "четвёртого", "пятого", "шестого", "седьмого", "восьмого", "девятого", "десятого", "одиннадцатого", "двенадцатого"}
+		past := map[int]string{5: "пять минут", 10: "десять минут", 15: "четверть", 20: "двадцать минут", 25: "двадцать пять минут", 30: "половина"}
+		to := map[int]string{5: "без пяти", 10: "без десяти", 15: "без четверти", 20: "без двадцати", 25: "без двадцати пяти"}
+		its = "сейчас"
+		switch {
+		case m == 0:
+			hour = card[h12]
+			switch {
+			case h12 == 1:
+			case h12 <= 4:
+				after = "часа"
+			default:
+				after = "часов"
+			}
+		case m <= 30:
+			top, hour = past[m], ord[next]
+		default:
+			top, hour = to[60-m], card[next]
+		}
+		return
+	}
+	top, hour = clockWords(h, m)
+	return "it's", top, hour, ""
+}
+
+// tWeather translates a weather description ("Clear" the sky is not "Clear" the record).
+func tWeather(s string) string {
+	if s == "Clear" {
+		return T("Clear·sky")
+	}
+	return T(s)
+}

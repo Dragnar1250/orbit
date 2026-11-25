@@ -262,15 +262,23 @@ func cachePath(key string) string {
 	return filepath.Join(appDir(), "cache", hex.EncodeToString(h[:8])+".json")
 }
 
-func lookupLyrics(t Track) (*cached, error) {
-	if b, err := os.ReadFile(cachePath(t.Key)); err == nil {
+// cachedLyrics: the saved answer for a song, if there is a usable one.
+func cachedLyrics(key string) *cached {
+	if b, err := os.ReadFile(cachePath(key)); err == nil {
 		var c cached
 		if json.Unmarshal(b, &c) == nil {
 			// "not found" answers are re-checked after 3 days (songs get added)
 			if !c.NotFound || time.Since(time.Unix(c.At, 0)) < 72*time.Hour {
-				return &c, nil
+				return &c
 			}
 		}
+	}
+	return nil
+}
+
+func lookupLyrics(t Track) (*cached, error) {
+	if c := cachedLyrics(t.Key); c != nil {
+		return c, nil
 	}
 	q := url.QueryEscape
 	var rec *lrcRec
@@ -382,16 +390,17 @@ func (l *Lyrics) Load(t *Track) {
 				logf("lyrics panic: %v", r)
 			}
 		}()
-		// give the player a moment to report the duration (needed for an exact match)
-		if tr.Duration == 0 {
-			time.Sleep(1200 * time.Millisecond)
+		// saved (or fetched ahead from the queue): no waiting at all
+		c := cachedLyrics(tr.Key)
+		var err error
+		// otherwise give the player a moment to report the duration (needed for an exact match)
+		if c == nil && tr.Duration == 0 {
+			time.Sleep(700 * time.Millisecond)
 			if s := media.Snapshot(); s.Track != nil && s.Track.Key == tr.Key {
 				tr.Duration = s.Track.Duration
 			}
 		}
-		var c *cached
-		var err error
-		for attempt := 0; attempt < 3; attempt++ {
+		for attempt := 0; c == nil && attempt < 3; attempt++ {
 			c, err = lookupLyrics(tr)
 			if err == nil {
 				break
@@ -465,4 +474,45 @@ func fetchCoverSized(title, artist, size string) []byte {
 		}
 	}
 	return b
+}
+
+var prefetched = struct {
+	sync.Mutex
+	tried map[string]bool
+}{tried: map[string]bool{}}
+
+// prefetchLyrics looks up the lyrics of the next two queued songs in the background, so they
+// are in the cache (and show at once) when the song starts. Each song is tried once a session.
+func prefetchLyrics(items []queueItem) {
+	var todo []Track
+	prefetched.Lock()
+	for i, it := range items {
+		if i >= 2 {
+			break
+		}
+		key := keyOf(it.Title, it.Artist)
+		if prefetched.tried[key] {
+			continue
+		}
+		prefetched.tried[key] = true
+		todo = append(todo, Track{Key: key, Title: it.Title, Artist: it.Artist, Album: it.Album, Duration: it.Dur})
+	}
+	if len(prefetched.tried) > 500 {
+		prefetched.tried = map[string]bool{}
+	}
+	prefetched.Unlock()
+	if len(todo) == 0 {
+		return
+	}
+	go func() {
+		defer func() { recover() }()
+		for _, t := range todo {
+			if cachedLyrics(t.Key) != nil {
+				continue
+			}
+			if _, err := lookupLyrics(t); err == nil {
+				logf("lyrics fetched ahead for %q", t.Title)
+			}
+		}
+	}()
 }

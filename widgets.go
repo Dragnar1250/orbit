@@ -14,6 +14,17 @@ import (
 
 var fontList []string
 
+func formatDate(t time.Time, long bool) string {
+	pic := "ddd, d MMM"
+	if long {
+		pic = "dddd, d MMMM"
+	}
+	if s := localDate(t, pic); s != "" {
+		return upperFirst(s)
+	}
+	return englishDate(t, long)
+}
+
 /* ---------- shared text painting ---------- */
 
 // spacedPath adds text to a path with extra letter spacing (px); returns the advance width.
@@ -132,7 +143,7 @@ func (cv *ClockView) Update(now time.Time, snap MediaSnap, bass float32, ui floa
 
 func (cv *ClockView) draw(now time.Time, W, H float32, pulse float32) {
 	g := cv.w.g()
-	gClear(g, 0)
+	cv.w.clearCanvas()
 	if pulse > 0 { // swell on the beat
 		s := 1 + 0.04*pulse
 		gTranslate(g, W/2, H/2)
@@ -255,31 +266,43 @@ func (cv *ClockView) draw(now time.Time, W, H float32, pulse float32) {
 			spacedPath(small, sf, extra, alignX(ew), top+lineH*2-th*0.02, 0)
 		}
 	case ckWords:
-		top, hour := clockWords(now.Hour(), now.Minute())
+		its, top, hour, after := clockWordsIn(langCode(), now.Hour(), now.Minute())
 		big := bodyH * 0.36
+		if after != "" && top != "" {
+			big *= 0.85
+		}
 		wf := func(sz float32) float32 {
-			return float32(math.Max(float64(spacedWidth(font(fam, float64(sz), true), hour, sp(sz))), float64(spacedWidth(font(fam, float64(sz*0.62), bold), top, sp(sz)))))
+			sf := font(fam, float64(sz*0.62), bold)
+			w := math.Max(float64(spacedWidth(font(fam, float64(sz), true), hour, sp(sz))), float64(spacedWidth(sf, top, sp(sz))))
+			return float32(math.Max(w, float64(spacedWidth(sf, after, sp(sz)))))
 		}
 		big = fit(big, wf)
 		mainSize = big
 		itsF := font(fam, float64(big*0.32), false)
 		topF := font(fam, float64(big*0.62), bold)
 		hourF := font(fam, float64(big), true)
-		_, ih := measure(itsF, "it's")
+		_, ih := measure(itsF, its)
 		_, tH := measure(topF, "Xg")
 		_, hH := measure(hourF, "Xg")
 		total := ih + hH*0.92
 		if top != "" {
 			total += tH * 0.9
 		}
+		if after != "" {
+			total += tH * 0.9
+		}
 		y := (bodyH - total) / 2
-		spacedPath(small, itsF, "it's", alignX(spacedWidth(itsF, "it's", 0)), y, 0)
+		spacedPath(small, itsF, its, alignX(spacedWidth(itsF, its, 0)), y, 0)
 		y += ih
 		if top != "" {
 			spacedPath(path, topF, top, alignX(spacedWidth(topF, top, sp(big*0.62))), y, sp(big*0.62))
 			y += tH * 0.9
 		}
 		spacedPath(path, hourF, hour, alignX(spacedWidth(hourF, hour, sp(big))), y-hH*0.06, sp(big))
+		if after != "" {
+			y += hH * 0.92
+			spacedPath(path, topF, after, alignX(spacedWidth(topF, after, sp(big*0.62))), y-hH*0.04, sp(big*0.62))
+		}
 	case ckAnalog:
 		cv.drawAnalog(g, now, W, bodyH)
 		mainSize = bodyH * 0.3
@@ -290,7 +313,7 @@ func (cv *ClockView) draw(now time.Time, W, H float32, pulse float32) {
 	if date != "" && cfg.ClockStyle != ckMinimal {
 		ds := dateH * 0.58
 		df := font(fam, float64(ds), true)
-		txt := strings.ToUpper(date)
+		txt := upperLang(date)
 		dsp := ds * 0.12
 		dw := spacedWidth(df, txt, dsp)
 		for i := 0; i < 10 && dw > W-2*pad; i++ {
@@ -430,7 +453,7 @@ func (wv *WeatherView) Update(now time.Time, ui float64) {
 
 func (wv *WeatherView) draw(d Weather, W, H float32, t float64, anim bool) {
 	g := wv.w.g()
-	gClear(g, 0)
+	wv.w.clearCanvas()
 	txt := textColor()
 	k := H / 160
 	style := cfg.WeatherStyle
@@ -450,11 +473,11 @@ func (wv *WeatherView) draw(d Weather, W, H float32, t float64, anim bool) {
 	tempStr := func(v float64) string { return fmt.Sprintf("%.0f%s", math.Round(v), unit) }
 	if !d.OK {
 		drawWeatherIcon(g, wkCloudy, 70*k, H/2, 52*k, t, false, 0.45)
-		msg := "Pick a city in the settings"
+		msg := T("Pick a city in the settings")
 		if cfg.WeatherCity != "" {
-			msg = "Loading weather for " + cfg.WeatherCity + "…"
+			msg = strings.Replace(T("Loading weather for {x}…"), "{x}", cfg.WeatherCity, 1)
 			if d.Err != "" {
-				msg = d.Err
+				msg = T(d.Err)
 			}
 		}
 		f := font(ff, float64(15*k), true)
@@ -474,10 +497,10 @@ func (wv *WeatherView) draw(d Weather, W, H float32, t float64, anim bool) {
 		tw, _ := measure(tf, ts)
 		shadowText(tf, ts, (W-tw)/2, 108*k, txt)
 		pf := font(ff, float64(13*k), true)
-		ps := strings.ToUpper(cityShort(d.Place)) + "  ·  " + strings.ToUpper(d.Text)
+		ps := upperLang(cityShort(d.Place)) + "  ·  " + upperLang(tWeather(d.Text))
 		pw, _ := measure(pf, ps)
 		if pw > W-10 {
-			ps = strings.ToUpper(cityShort(d.Place))
+			ps = upperLang(cityShort(d.Place))
 			pw, _ = measure(pf, ps)
 		}
 		shadowText(pf, ps, (W-pw)/2, 164*k, withAlpha(txt, 0.8))
@@ -490,19 +513,19 @@ func (wv *WeatherView) draw(d Weather, W, H float32, t float64, anim bool) {
 		tw, _ := measure(tf, ts)
 		drawText(g, tf, ts, x, 18*k, W, txt)
 		cf := font(ff, float64(15*k), true)
-		drawText(g, cf, d.Text, x+tw+12*k, 34*k, W-x-tw-16*k, txt)
+		drawText(g, cf, tWeather(d.Text), x+tw+12*k, 34*k, W-x-tw-16*k, txt)
 		if len(d.Days) > 0 {
-			hl := fmt.Sprintf("H %s  L %s", tempStr(d.Days[0].Max), tempStr(d.Days[0].Min))
+			hl := fmt.Sprintf(T("H %s  L %s"), tempStr(d.Days[0].Max), tempStr(d.Days[0].Min))
 			drawText(g, font(ff, float64(13*k), false), hl, x+tw+12*k, 56*k, W-x-tw-16*k, withAlpha(txt, 0.65))
 		}
 		pf := font(ff, float64(13*k), true)
-		drawText(g, pf, strings.ToUpper(cityShort(d.Place)), x, 92*k, W-x-14*k, withAlpha(txt, 0.85))
+		drawText(g, pf, upperLang(cityShort(d.Place)), x, 92*k, W-x-14*k, withAlpha(txt, 0.85))
 		if cfg.WeatherDetails {
-			spd := "km/h"
+			spd := T("km/h")
 			if d.Unit == "F" {
-				spd = "mph"
+				spd = T("mph")
 			}
-			det := fmt.Sprintf("Feels %s  ·  %.0f%%  ·  %.0f %s", tempStr(d.Feels), d.Humidity, d.Wind, spd)
+			det := fmt.Sprintf(T("Feels %s  ·  %.0f%%  ·  %.0f %s"), tempStr(d.Feels), d.Humidity, d.Wind, spd)
 			drawText(g, font(ff, float64(12*k), false), det, x, 116*k, W-x-14*k, withAlpha(txt, 0.6))
 		}
 		if style == 2 && len(d.Days) > 1 {
@@ -738,9 +761,7 @@ func (gv *GlowView) Update(now time.Time, snap MediaSnap, bands [nBands]float32,
 	if fps == 0 {
 		fps = 5
 	}
-	// (a few ms early is on time: frames come every 1/60 s, give or take, and a strict check
-	// would skip every other one and drop to 15 fps)
-	if now.Sub(gv.frameAt) < time.Second/time.Duration(fps)-4*time.Millisecond && !styleDirty {
+	if now.Sub(gv.frameAt) < time.Second/time.Duration(fps) && !styleDirty {
 		return
 	}
 	dt := math.Min(0.2, now.Sub(gv.frameAt).Seconds())
@@ -771,7 +792,6 @@ func (gv *GlowView) Update(now time.Time, snap MediaSnap, bands [nBands]float32,
 			if n >= len(gv.parts) {
 				w := newWidget("glow", "Glow")
 				w.movable = false
-				w.useSoft(1, true) // the Mac: drawn at its points, not its Retina pixels
 				gv.parts = append(gv.parts, &glowPart{w: w})
 			}
 			p := gv.parts[n]
@@ -948,9 +968,8 @@ func (gv *GlowView) colourAt(u float64, lv float32) uint32 {
 
 func (gv *GlowView) drawPart(p *glowPart, m RECT, wx, wy, T int) {
 	g := p.w.g()
-	gClear(g, 0)
+	p.w.clearCanvas()
 	gTranslate(g, -float32(wx), -float32(wy))
-	soft := softBegin(g)
 	win := RECT{int32(wx), int32(wy), int32(wx + p.w.w), int32(wy + p.w.h)}
 	for _, sd := range gv.sides() {
 		// draw every side that reaches into this window (the corners belong to top / bottom)
@@ -966,9 +985,6 @@ func (gv *GlowView) drawPart(p *glowPart, m RECT, wx, wy, T int) {
 	}
 	if cfg.GlowStyle == glEmbers {
 		gv.drawEmbers(g, p.mon, m, float32(T), win)
-	}
-	if soft {
-		softEnd(g)
 	}
 	gReset(g)
 	p.w.present()

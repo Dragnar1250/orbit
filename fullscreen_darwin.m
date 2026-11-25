@@ -1,9 +1,7 @@
 // Full screen on the Mac: a borderless window over the whole screen (menu bar and Dock too),
-// its keys and mouse turned into the same calls the Windows window messages make; and the music
-// video in a WebKit window right under it.
+// its keys and mouse turned into the same calls the Windows window messages make.
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
-#import <WebKit/WebKit.h>
 #include "_cgo_export.h"
 #include "gdip_darwin.h"
 #include "app_darwin.h"
@@ -87,7 +85,6 @@ static int vkOf(NSEvent *e) {
 @end
 
 static OrbitFSWindow *fsWin;
-static NSWindow *videoWin;
 static int cursorHidden;
 
 static NSScreen *screenFor(double x, double y, double w, double h) {
@@ -141,38 +138,8 @@ void fs_cursor(int show) {
 	if (!show && !cursorHidden) { [NSCursor hide]; cursorHidden = 1; }
 }
 
-/* ---------- the music video: Orbit's video page in WebKit, right under full screen ---------- */
-
-void fs_video_open(const char *url) {
-	if (videoWin || !fsWin) return;
-	videoWin = [[NSWindow alloc] initWithContentRect:fsWin.frame styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO screen:fsWin.screen];
-	[videoWin setFrame:fsWin.frame display:NO];
-	videoWin.releasedWhenClosed = NO;
-	videoWin.ignoresMouseEvents = YES;
-	videoWin.level = NSMainMenuWindowLevel; // just under full screen
-	videoWin.backgroundColor = NSColor.blackColor;
-	videoWin.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary;
-	WKWebViewConfiguration *c = [WKWebViewConfiguration new];
-	c.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone; // plays by itself (muted)
-	c.websiteDataStore = [WKWebsiteDataStore nonPersistentDataStore];
-	WKWebView *wv = [[WKWebView alloc] initWithFrame:videoWin.contentView.bounds configuration:c];
-	wv.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-	videoWin.contentView = wv;
-	[wv loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:[NSString stringWithUTF8String:url]]]];
-	[videoWin orderFront:nil];
-	[videoWin orderWindow:NSWindowBelow relativeTo:fsWin.windowNumber];
-}
-
-void fs_video_close(void) {
-	if (!videoWin) return;
-	WKWebView *wv = (WKWebView *)videoWin.contentView;
-	if ([wv isKindOfClass:[WKWebView class]]) [wv loadHTMLString:@"" baseURL:nil];
-	[videoWin orderOut:nil];
-	[videoWin close];
-	videoWin = nil;
-}
-
-int fs_video_open_now(void) { return videoWin != nil; }
+// ctrl or command held (Cinema: previous / next song with the arrows)
+int os_ctrl_down(void) { return ([NSEvent modifierFlags] & (NSEventModifierFlagControl | NSEventModifierFlagCommand)) != 0; }
 
 /* ---------- a small menu at the mouse (search services) ---------- */
 

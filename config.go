@@ -29,7 +29,7 @@ type HistItem struct {
 // Lyrics styles (same order as Weyv)
 var styleNames = []string{"Flow", "Word reel", "Cinematic", "Kinetic", "Typewriter", "Neon", "Subtitle", "Stack", "Rise", "Pop", "Karaoke", "Scatter",
 	"Glass", "Bounce", "Wave", "Glitch", "Decode", "Highlighter", "Echo", "Orbit", "Slide", "Spotlight",
-	"Rain", "Swing", "Split", "Focus", "Ink", "Constellation", "Bouncing"}
+	"Rain", "Swing", "Split", "Focus", "Ink", "Constellation", "Bouncing", "Split-flap", "LED board"}
 
 const (
 	stFlow = iota
@@ -61,6 +61,8 @@ const (
 	stInk
 	stConstellation
 	stBouncing
+	stFlap // 1.19: a departures board — every letter flips through others before it settles
+	stLED  // 1.19: a scrolling LED dot-matrix panel
 )
 
 var effectNames = []string{"None", "Soft glow", "Strong glow", "Shadow", "Outline", "Neon", "Gradient", "Chromatic", "Long shadow", "Hollow", "Soft blur", "Glass"}
@@ -106,7 +108,7 @@ var themes = []theme{
 var cornerNames = []string{"Bottom left", "Bottom right", "Top left", "Top right"}
 
 // 0 and 1 keep their meaning from 1.0–1.5
-var discNames = []string{"Picture disc", "Black vinyl", "Coloured", "Splatter", "Marble", "Clear", "Gold"}
+var discNames = []string{"Picture disc", "Black vinyl", "Coloured", "Splatter", "Marble", "Clear", "Gold", "CD (holographic)", "Neon", "Two-tone", "Glow in the dark"}
 
 const (
 	discPicture = iota
@@ -116,6 +118,10 @@ const (
 	discMarble
 	discClear
 	discGold
+	discCD       // 1.19: a spinning CD, rainbow reflections that drift and flash on the bass
+	discNeon     // 1.19: black vinyl with glowing neon rings
+	discTwoTone  // 1.19: half one colour, half a lighter one
+	discGlowDark // 1.19: glow-in-the-dark green
 )
 
 // allWidgets: every desktop widget, in the order the settings show them.
@@ -165,7 +171,7 @@ var glowModeNames = []string{"With the music", "Steady rhythm"}
 var glowColorNames = []string{"Match the visualizer", "Album colours", "My own", "Rainbow"}
 var glowScreenNames = []string{"Every screen", "Main screen only"}
 
-var visNames = []string{"Halo", "Ring", "Bars", "Mirror", "Blocks", "Wave"}
+var visNames = []string{"Halo", "Ring", "Bars", "Mirror", "Blocks", "Wave", "Particles", "Oscilloscope", "Liquid"}
 
 const (
 	visHalo = iota
@@ -174,6 +180,9 @@ const (
 	visMirror
 	visBlocks
 	visWave
+	visParticles // 1.19: album-coloured particles burst out on every kick and drift back
+	visScope     // 1.19: the waveform as a green phosphor trace
+	visLiquid    // 1.19: a soft blob around the cover that the music shapes
 )
 
 // visualizer colour gradients (from → to). 0 = lyrics theme, 1 = album, last = custom
@@ -202,31 +211,28 @@ const (
 )
 
 // full screen
-var fsModeNames = []string{"Visualizer", "Album art", "Vinyl", "Lyrics only"}
-var fsBgNames = []string{"Album art", "Black hole", "Aurora", "Nebula", "Colour flow", "Starfield", "Plain", "Music video"}
-var fsInfoNames = []string{"Off", "Bottom left", "Under the centre"}
-var fsLyrPosNames = []string{"Under the centre", "Over the centre", "Top", "Wandering"}
 var fsScreenNames = []string{"Where the mouse is", "Main screen"}
+var uiThemeNames = []string{"Like Windows", "Dark", "Light"}
+var fsBgNames = []string{"Cover colours", "Cover", "Gradient", "Dark", "Flowing colours"}
+var fsCoverNames = []string{"Cover", "Big cover", "Vinyl"}
+
+// the full-screen tonearm's colours (0 = no arm)
+var fsArmNames = []string{"No arm", "Silver", "Black", "Gold"}
 
 const (
-	fsmVis = iota
-	fsmArt
-	fsmVinyl
-	fsmLyrics
+	cbColours  = iota // the cover blurred into soft light
+	cbCover           // the cover itself across the screen, darkened
+	cbGradient        // two of the cover's colours, corner to corner
+	cbDark            // near black with a faint glow of the album's colour
+	cbFlow            // the cover's colours drifting slowly (moving)
 )
 
-const (
-	fsbArt = iota
-	fsbBlackHole
-	fsbAurora
-	fsbNebula
-	fsbFlow
-	fsbStars
-	fsbPlain
-	fsbVideo // the song's music video (YouTube, muted, in time)
-)
+// stageNames: the Cinema lyrics stage — "Lines" (Apple-style, line by line) and every lyric style.
+func stageNames() []string { return append([]string{"Lines"}, styleNames...) }
 
 var vinylLayoutNames = []string{"Free", "Corner"}
+
+var swapStyleNames = []string{"Lift & drop", "Sleeve"}
 var ambColorNames = []string{"Album colours", "Lyrics theme", "My own", "Slow rainbow"}
 var ambEffectNames = []string{"Still", "Breathe", "Beat", "Flicker", "Drift"}
 
@@ -272,6 +278,12 @@ type Config struct {
 	ArmLift       bool    // needle lowers when music starts, lifts when it stops
 	ClickPlay     bool    // single click on the record = play / pause
 	VinylLayout   int     // free / corner (half the record tucked into the screen corner)
+	Worn          bool    // 1.19: dust and fine scratches on the record, sparkles where the needle runs
+	SwapAnim      bool    // 1.19: new song → the record is changed (animated)
+	SwapStyle     int     // 1.19.1: 0 lift & drop (fade), 1 sleeve
+	VinylNext     int     // 1.19.1: the song wheel shows 0 what plays next (Spotify queue), 1 what played
+	Scratch       bool    // 1.19: hold the record and turn it to scrub through the song
+	ScratchSec    float64 // 1.19: seconds of song for one full turn of the record
 	// ambient light: a soft glow behind the record and the visualizer
 	AmbVinyl     bool
 	AmbHalo      bool
@@ -282,56 +294,30 @@ type Config struct {
 	AmbSize      float64 // 0.5..2
 	HoverEdit    bool    // move / resize a widget just by pointing at it on the desktop
 	UITheme      int     // the settings window: 0 like Windows, 1 dark, 2 light
-	// full screen
-	FsMode        int
-	FsBg          int
-	FsVis         int // 0 = same as the widget, else visNames index + 1
-	FsPalette     int
-	FsRipple      bool // a ring leaves the centre on every bass hit
-	FsHiRes       bool // sharp 2000 px covers from iTunes
-	FsInfo        int
-	FsClock       bool
-	FsFPS         int // 30 / 60
-	FsScreen      int
-	FsLyrics      bool
-	FsLyricsStyle int
-	FsFont        string
-	FsTextSize    int
-	FsBold        bool
-	FsEffect      int
-	FsTheme       int
-	FsTextColor   string
-	FsAccentColor string
-	FsLyricsPos   int
-	FsLyricsWidth int
-	FsFrame       bool
-	FsFrameStyle  int
-	FsFrameColor  int
-	FsFrameBright float64
-	FsFrameReach  float64
-	FsKind        int // 0 = music display, 1 = desktop skin
-	// desktop skin
-	SkinBg          int
-	SkinDim         float64 // 0..0.85 darkens the background
-	SkinClock       bool
-	SkinDate        bool
-	SkinClockFont   int
-	SkinClockColor  int
-	SkinList        bool // Continue playing
-	SkinCentre      int
-	SkinFlowCount   int    // cover flow: songs on each side of the playing one (1..3)
+	Lang         string  // "" = Windows language, "en", "tr", "ru"
+	// full screen (Cinema)
+	FsHiRes         bool // sharp 2000 px covers from iTunes
+	FsClock         bool
+	FsFPS           int // 30 / 60 / 240 (= every refresh of the screen)
+	FsScreen        int
+	FsLyrics        bool
+	FsStage         int // 1.21: the lyrics stage — 0 Lines (Apple-style), else styleNames index + 1
+	FsBg            int // 1.22: Cinema's background (fsBgNames)
+	FsCover         int // 1.22: the left side — 0 the cover, 2 a turning record (1, "big cover", was removed in 1.22.5)
+	FsDisc          int // 1.22: the record's look — 0 like the Vinyl widget, else discNames index + 1
+	FsArm           int // 1.22.2: the tonearm in full screen — 0 none, else fsArmNames index
+	FsFont          string
+	FsTextSize      int
+	FsBold          bool
+	FsEffect        int
+	FsTheme         int
+	FsTextColor     string
+	FsAccentColor   string
 	SpotifyClientID string // optional Spotify connection (the user's own app) → the real queue
 	SpotifyRefresh  string
 	SpotifyScopes   string // what the Spotify sign-in allows
 	UpdateCheck     bool   // look for new versions on GitHub
 	UpdateAuto      bool   // and put them in by themselves
-	SkinBar         bool
-	SkinService     int
-	SkinLyrics      bool
-	SkinLyricsStyle int
-	SkinFrame       bool
-	SkinFrameStyle  int
-	SkinGlass       float64 // 0.2..1 how solid the glass panels are
 
 	// halo
 	ShowHalo bool
@@ -399,9 +385,9 @@ type Config struct {
 	Font       int `json:",omitempty"`
 }
 
-const configVersion = 10
+const configVersion = 12
 
-const appVersion = "1.18.0"
+const appVersion = "1.23.1"
 
 var legacyFonts = []string{"Consolas", "Cascadia Mono", "Bahnschrift", "Segoe UI", "Segoe UI Black", "Impact", "Georgia", "Courier New", "Segoe Script", "Ink Free", "Lucida Console", "Trebuchet MS"}
 
@@ -414,16 +400,14 @@ func defaultConfig() *Config {
 		ShowPrevLine: true, LyricsWidth: 46,
 		ShowVinyl: true, DiscStyle: 0, VinylCorner: 0, SpinRPM: 12, ShowArm: true, ShowList: true, ListCount: 4,
 		DiscColorMode: 1, DiscColor: "#C2185B", GrooveLight: true, DiscGlow: 1, Shine: true, ArmLift: true, ClickPlay: true,
+		SwapAnim: true, Scratch: true, ScratchSec: 6,
 		ShowHalo: true, HaloBars: 140, HaloLength: 1, HaloSens: 1, HaloPulse: 0.045, HaloSpin: false, HaloGlow: 1,
 		ClockStyle: ckDigital, ClockWeight: 300, ClockColor: "#FFFFFF", ClockColor2: "#9B8CFF", Clock24h: true, ClockDate: true,
 		ClockShadow: true, ClockDateLong: true, ClockAlign: 1,
 		WeatherAnimate: true, WeatherDetails: true, WeatherCard: 0.6,
 		AmbVinyl: true, AmbHalo: true, AmbColor: "#FF8A3D", AmbEffect: 1, AmbBright: 0.35, AmbSize: 1, HoverEdit: true,
-		FsMode: fsmArt, FsBg: fsbBlackHole, FsPalette: 1, FsTheme: 1, FsRipple: true, FsHiRes: true, FsInfo: 1, FsFPS: 30, FsLyrics: true, FsLyricsStyle: stGlass,
-		FsFont: "Segoe UI", FsTextSize: 64, FsBold: true, FsEffect: fxSoftGlow, FsTextColor: "#FFFFFF", FsAccentColor: "#FFB86B", FsLyricsWidth: 70,
-		FsFrame: true, FsFrameStyle: glSoft, FsFrameBright: 0.7, FsFrameReach: 1.2,
-		SkinBg: 8, SkinDim: 0.3, SkinClock: true, SkinDate: true, SkinClockColor: 0, SkinList: true, SkinCentre: 1, SkinFlowCount: 3, SkinBar: true,
-		SkinLyrics: true, SkinLyricsStyle: stKinetic, SkinFrame: true, SkinFrameStyle: glSoft, SkinGlass: 0.6,
+		FsHiRes: true, FsClock: true, FsFPS: 60, FsLyrics: true, FsStage: 1 + stScatter, FsTheme: 1, FsArm: 1,
+		FsFont: "Segoe UI", FsTextSize: 64, FsBold: true, FsEffect: fxSoftGlow, FsTextColor: "#FFFFFF", FsAccentColor: "#FFB86B",
 		GlowStyle: glSoft, GlowSpeed: 0.5, GlowBright: 0.8, GlowReach: 1, GlowColor: "#7B5CFF", GlowColorMode: 2,
 		HaloColorA: "#7B5CFF", HaloColorB: "#E15BFF", HaloCard: 0, MotionAmount: 1,
 		FPS:     60,
@@ -464,6 +448,9 @@ func loadConfig() {
 			c.FPS = 60
 		}
 		c.Version = 3
+	}
+	if c.Version > 0 && c.Version < 12 {
+		c.FsStage, c.FsFPS = 1+stScatter, 60 // 1.21: the new lyrics stage, and full screen at 60 fps
 	}
 	c.Version = configVersion
 	c.SpotifyRefresh = openSecret(c.SpotifyRefresh)
@@ -545,6 +532,9 @@ func (c *Config) validateFields() {
 	c.DiscStyle = clampI(c.DiscStyle, 0, len(discNames)-1)
 	c.VinylCorner = clampI(c.VinylCorner, 0, 3)
 	c.SpinRPM = clampF(c.SpinRPM, 0, 78)
+	c.ScratchSec = clampF(c.ScratchSec, 2, 30)
+	c.SwapStyle = clampI(c.SwapStyle, 0, len(swapStyleNames)-1)
+	c.VinylNext = clampI(c.VinylNext, 0, 1)
 	if c.Upper && c.TextCase == 0 {
 		c.TextCase = 1
 	}
@@ -606,16 +596,18 @@ func (c *Config) validateFields() {
 	}
 	c.AmbBright = clampF(c.AmbBright, 0, 1)
 	c.AmbSize = clampF(c.AmbSize, 0.5, 2)
-	c.FsMode = clampI(c.FsMode, 0, len(fsModeNames)-1)
-	c.FsBg = clampI(c.FsBg, 0, len(fsBgNames)-1)
-	c.FsVis = clampI(c.FsVis, 0, len(visNames))
-	c.FsPalette = clampI(c.FsPalette, 0, len(visPalettes)-1)
-	c.FsInfo = clampI(c.FsInfo, 0, len(fsInfoNames)-1)
-	if c.FsFPS != 60 {
-		c.FsFPS = 30
+	if c.FsFPS != 30 && c.FsFPS != 240 { // 240: as fast as the screen refreshes (up to 240 Hz)
+		c.FsFPS = 60
 	}
 	c.FsScreen = clampI(c.FsScreen, 0, len(fsScreenNames)-1)
-	c.FsLyricsStyle = clampI(c.FsLyricsStyle, 0, len(styleNames)-1)
+	c.FsStage = clampI(c.FsStage, 0, len(styleNames))
+	c.FsBg = clampI(c.FsBg, 0, len(fsBgNames)-1)
+	c.FsCover = clampI(c.FsCover, 0, len(fsCoverNames)-1)
+	if c.FsCover == 1 { // 1.22.5: "Big cover" is gone — the cover it is
+		c.FsCover = 0
+	}
+	c.FsDisc = clampI(c.FsDisc, 0, len(discNames))
+	c.FsArm = clampI(c.FsArm, 0, len(fsArmNames)-1)
 	if strings.TrimSpace(c.FsFont) == "" || len(c.FsFont) > 100 {
 		c.FsFont = "Segoe UI"
 	}
@@ -628,31 +620,14 @@ func (c *Config) validateFields() {
 	if !reHex.MatchString(c.FsAccentColor) {
 		c.FsAccentColor = "#FFB86B"
 	}
-	c.FsLyricsPos = clampI(c.FsLyricsPos, 0, len(fsLyrPosNames)-1)
-	c.FsLyricsWidth = clampI(c.FsLyricsWidth, 30, 95)
-	c.FsFrameStyle = clampI(c.FsFrameStyle, 0, len(glowStyleNames)-1)
-	c.FsFrameColor = clampI(c.FsFrameColor, 0, len(glowColorNames)-1)
-	c.FsFrameBright = clampF(c.FsFrameBright, 0.1, 1)
-	c.FsFrameReach = clampF(c.FsFrameReach, 0.3, 2.5)
-	c.FsKind = clampI(c.FsKind, 0, len(fsKindNames)-1)
 	c.UITheme = clampI(c.UITheme, 0, len(uiThemeNames)-1)
-	c.SkinBg = clampI(c.SkinBg, 0, len(skinBgNames)-1)
-	c.SkinDim = clampF(c.SkinDim, 0, 0.85)
-	c.SkinClockFont = clampI(c.SkinClockFont, 0, len(skinClockFontNames)-1)
-	c.SkinClockColor = clampI(c.SkinClockColor, 0, len(skinClockColorNames)-1)
-	c.SkinCentre = clampI(c.SkinCentre, 0, len(skinCentreNames)-1)
-	if c.SkinFlowCount == 0 {
-		c.SkinFlowCount = 3 // settings from before 1.16
+	if !validLang(c.Lang) {
+		c.Lang = ""
 	}
-	c.SkinFlowCount = clampI(c.SkinFlowCount, 1, 3)
 	c.SpotifyClientID = strings.TrimSpace(c.SpotifyClientID)
 	if len(c.SpotifyClientID) > 64 || strings.ContainsAny(c.SpotifyClientID, " /?&#\\\"'<>") {
 		c.SpotifyClientID = ""
 	}
-	c.SkinService = clampI(c.SkinService, 0, len(serviceNames)-1)
-	c.SkinLyricsStyle = clampI(c.SkinLyricsStyle, 0, len(styleNames)-1)
-	c.SkinFrameStyle = clampI(c.SkinFrameStyle, 0, len(glowStyleNames)-1)
-	c.SkinGlass = clampF(c.SkinGlass, 0.2, 1)
 	c.ListCount = clampI(c.ListCount, 0, 6)
 	c.HaloBars = clampI(c.HaloBars, 24, 240)
 	c.HaloLength = clampF(c.HaloLength, 0.2, 2.5)

@@ -1,6 +1,7 @@
 package main
 
-// Full screen on Windows: its layered window, the window messages, putting frames on screen.
+// Full screen: Cinema — one ordinary window over a whole monitor (see cinema_windows.go).
+// Esc, F11 or a double-click close it.
 
 import (
 	"math"
@@ -22,14 +23,12 @@ var (
 	pMonitorFromPoint = user32.NewProc("MonitorFromPoint")
 	pSetFocus         = user32.NewProc("SetFocus")
 	pValidateRect     = user32.NewProc("ValidateRect")
-	pInvalidateRect   = user32.NewProc("InvalidateRect")
 )
 
 const (
 	fsWS_VISIBLE      = 0x10000000
 	fsWS_EX_TOPMOST   = 0x00000008
 	fsCS_DBLCLKS      = 0x0008
-	fsSRCCOPY         = 0x00CC0020
 	fsWM_PAINT        = 0x000F
 	fsWM_ERASEBKGND   = 0x0014
 	fsWM_ACTIVATE     = 0x0006
@@ -39,7 +38,6 @@ const (
 	fsWM_LBUTTONDBL   = 0x0203
 	fsWM_LBUTTONUP    = 0x0202
 	fsWM_LBUTTONDOWN  = 0x0201
-	fsWM_CHAR         = 0x0102
 	fsWM_RBUTTONUP    = 0x0205
 	fsWM_MOUSEWHEEL   = 0x020A
 	fsWM_SETCURSOR    = 0x0020
@@ -53,6 +51,8 @@ var (
 	fsProcCB     uintptr // set on first use (a package-level NewCallback(fsProc) would be an init cycle)
 	fsRegistered bool
 )
+
+/* ---------- open / close ---------- */
 
 // fsMonitor: the screen under the mouse, or the main one.
 func fsMonitor() RECT {
@@ -93,29 +93,18 @@ func openFullscreen() {
 	}
 	m := fsMonitor()
 	W, H := int(m.Right-m.Left), int(m.Bottom-m.Top)
-	f := &FullView{winW: W, winH: H, mon: m, last: time.Now(), ver: -1, lyrIdx: -3, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
-	// big screens: draw at about 1080p and stretch — each pixel costs, and 4K has four times as many
-	q := 1.0 // sharp first: only drawn smaller if this PC turns out too slow (see measure)
-	if W*H > 3840*2160 {
-		q = math.Sqrt(3840 * 2160 / float64(W*H)) // beyond 4K
-	}
-	if !f.setupBuffers(q) {
+	f := &FullView{winW: W, winH: H, mon: m, q: 1, last: time.Now(), ver: -1}
+	if !f.cinemaAlloc() {
 		f.free()
 		logf("full screen: out of memory for %dx%d", W, H)
 		return
 	}
-	f.vin = &VinylView{w: offscreenWidget("vinyl"), last: time.Now(), version: -1, sx: 1, sy: 1, armT: 0}
-	f.hal = &HaloView{w: offscreenWidget("halo"), last: time.Now()}
 	f.lyr = &LyricsView{w: offscreenWidget("lyrics"), version: -1, idx: -2, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
-	f.glow = newGlowView()
-	f.glow.mons, f.glow.prim = []RECT{{0, 0, int32(f.W), int32(f.H)}}, []bool{true}
-	f.stars = make([]fsStar, 180)
-	for i := range f.stars {
-		f.stars[i] = f.newStar(true)
-	}
-	f.mouseAt, f.hintAt = time.Now(), time.Now()
+	f.vin = &VinylView{w: offscreenWidget("vinyl"), last: time.Now(), version: -1, sx: 1, sy: 1, armT: 0, swapT: -1}
+	f.mouseAt = time.Now()
 	fs = f
-	f.hwnd = call(pCreateWindowExW, fsWS_EX_TOPMOST|WS_EX_LAYERED, uintptr(unsafe.Pointer(fsClass)), uintptr(unsafe.Pointer(u16("Orbit — Full screen"))),
+	// an ordinary window: Windows shows what we draw without blending the whole screen
+	f.hwnd = call(pCreateWindowExW, fsWS_EX_TOPMOST, uintptr(unsafe.Pointer(fsClass)), uintptr(unsafe.Pointer(u16("Orbit — Cinema"))),
 		WS_POPUP|fsWS_VISIBLE, uintptr(m.Left), uintptr(m.Top), uintptr(W), uintptr(H), 0, 0, hInstance, 0)
 	if f.hwnd == 0 {
 		logf("full screen: CreateWindowEx failed")
@@ -131,8 +120,11 @@ func openFullscreen() {
 	if glowView != nil {
 		glowView.hideAll()
 	}
-	atomic.StoreInt32(&fpsNow, int32(cfg.FsFPS))
-	logf("full screen on %dx%d", W, H)
+	atomic.StoreInt32(&fpsNow, 60)
+	vsyncStart(f.hwnd)
+	setPriority(true)
+	f.say("Press H for shortcuts")
+	logf("full screen (Cinema) on %dx%d", W, H)
 }
 
 func closeFullscreen() {
@@ -141,13 +133,11 @@ func closeFullscreen() {
 		return
 	}
 	fs = nil
+	vsyncStop()
+	setPriority(false)
 	if f.hwnd != 0 {
 		call(pDestroyWindow, f.hwnd)
 	}
-	f.edgeStop()
-	video.Lock()
-	video.Want = false
-	video.Unlock()
 	f.free()
 	applyFPS()
 	needRedraw, layoutDirty, styleDirty = true, true, true
@@ -169,7 +159,7 @@ func fsProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	case fsWM_ERASEBKGND:
 		return 1
 	case fsWM_PAINT:
-		f.blit()
+		f.cinemaPresent(true, nil)
 		call(pValidateRect, hwnd, 0)
 		return 0
 	case fsWM_ACTIVATE: // let other windows in front while we are not the active one
@@ -178,52 +168,55 @@ func fsProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 			after = fsHWND_NOTOPMOST
 		}
 		call(pSetWindowPos, hwnd, after, 0, 0, 0, 0, fsSWP_NOMOVESIZE)
-		if e := f.edge.hwnd; e != 0 { // the video window follows: never left on top of other apps
-			if after == fsHWND_NOTOPMOST {
-				call(pSetWindowPos, e, fsHWND_NOTOPMOST, 0, 0, 0, 0, fsSWP_NOMOVESIZE)
-			}
-			call(pSetWindowPos, e, hwnd, 0, 0, 0, 0, fsSWP_NOMOVESIZE)
-		}
 		return 0
 	case fsWM_KEYDOWN, fsWM_SYSKEYDOWN:
 		if wp == 0x73 && msg == fsWM_SYSKEYDOWN { // Alt+F4
 			closeFullscreen()
 			return 0
 		}
-		f.onKey(int(wp))
-		return 0
-	case fsWM_CHAR:
-		f.onChar(rune(wp))
+		f.cinemaKey(int(wp))
 		return 0
 	case fsWM_LBUTTONDOWN:
-		f.onDown(f.at(lp))
+		x, y := f.at(lp)
+		f.cinemaDown(float64(x), float64(y))
 		return 0
 	case fsWM_LBUTTONUP:
-		x, _ := f.at(lp)
-		f.onUp(x)
+		f.cinemaUp()
 		return 0
 	case fsWM_LBUTTONDBL:
-		f.onDouble(f.at(lp))
+		x, y := f.at(lp)
+		if f.cinemaDown(float64(x), float64(y)) {
+			return 0 // a quick second click on a button is still a click
+		}
+		closeFullscreen()
 		return 0
 	case fsWM_RBUTTONUP:
-		f.onRight()
+		f.wake()
+		showMenu()
+		if fs != nil { // the menu took the focus: take it back
+			call(pSetForegroundWindow, fs.hwnd)
+		}
 		return 0
 	case fsWM_MOUSEWHEEL:
-		d := int(int16(uint16(wp >> 16)))
-		var pt POINT
-		call(pGetCursorPos, uintptr(unsafe.Pointer(&pt)))
-		call(pScreenToClient, f.hwnd, uintptr(unsafe.Pointer(&pt)))
-		x, y := f.at(uintptr(uint16(pt.X)) | uintptr(uint16(pt.Y))<<16)
-		f.onWheel(x, y, d)
+		f.wake()
+		f.cinemaWheel(int(int16(uint16(wp>>16))) > 0)
 		return 0
 	case fsWM_MOUSEMOVE:
 		pt := POINT{int32(int16(uint16(lp))), int32(int16(uint16(lp >> 16)))}
-		x, y := f.at(lp)
-		f.onMove(pt, x, y)
+		if pt != f.mousePt { // Windows repeats WM_MOUSEMOVE without a real move
+			f.mousePt = pt
+			f.wake()
+			x, y := f.at(lp)
+			f.cinemaMove(float64(x), float64(y))
+		}
 		return 0
 	case fsWM_SETCURSOR:
 		if f.cursorOff {
 			call(pSetCursor, 0)
+			return 1
+		}
+		if f.cin.hover != cinHoverNone {
+			call(pSetCursor, call(pLoadCursorW, 0, IDC_HAND))
 			return 1
 		}
 	case WM_CLOSE:
@@ -240,33 +233,59 @@ func (f *FullView) at(lp uintptr) (float32, float32) {
 	return float32(int16(uint16(lp))) * q, float32(int16(uint16(lp>>16))) * q
 }
 
-// blend copies a premultiplied canvas onto the frame (GDI's AlphaBlend is much faster than GDI+ here).
-func (f *FullView) blend(c *Canvas, x, y int, alpha byte) {
-	if c == nil || alpha == 0 {
+/* ---------- every frame ---------- */
+
+func (f *FullView) cinemaPresent(full bool, dirty []rectF) {
+	c := &f.cin
+	if c.buf == nil || f.hwnd == 0 {
 		return
 	}
-	bf := uintptr(0) | uintptr(alpha)<<16 | uintptr(1)<<24 // AC_SRC_OVER, constant alpha, AC_SRC_ALPHA
-	call(pAlphaBlend, f.buf.dc, uintptr(int32(x)), uintptr(int32(y)), uintptr(c.w), uintptr(c.h), c.dc, 0, 0, uintptr(c.w), uintptr(c.h), bf)
-	call(pGdiFlush)
-}
-
-// gpuUpscale: a frame drawn smaller is stretched by the window system (Mac) instead of the CPU.
-const gpuUpscale = false
-
-func (f *FullView) blit() {
-	if f.buf == nil || f.hwnd == 0 {
+	gdiFlush()
+	dc := call(pGetDC, f.hwnd)
+	if dc == 0 {
 		return
 	}
-	src := f.buf
-	if f.out != nil { // drawn smaller than the screen: stretch it up on all cores
-		scaleBilinear(pix(f.out), f.out.w, f.out.h, pix(f.buf), f.buf.w, f.buf.h)
-		src = f.out
+	defer call(pReleaseDC, f.hwnd, dc)
+	const srccopy = 0x00CC0020
+	if full {
+		call(pBitBlt, dc, 0, 0, uintptr(c.buf.w), uintptr(c.buf.h), c.buf.dc, 0, 0, srccopy)
+		return
 	}
-	// a layered window: where the frame is see-through the music video behind it shows
-	size := SIZE{int32(src.w), int32(src.h)}
-	at := POINT{0, 0}
-	blend := BLENDFUNCTION{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA}
-	call(pUpdateLayeredWindow, f.hwnd, 0, 0, uintptr(unsafe.Pointer(&size)), src.dc, uintptr(unsafe.Pointer(&at)), 0, uintptr(unsafe.Pointer(&blend)), ULW_ALPHA)
+	for _, r := range dirty {
+		x0, y0 := int(math.Max(0, math.Floor(r.X))), int(math.Max(0, math.Floor(r.Y)))
+		x1, y1 := int(math.Min(float64(c.buf.w), math.Ceil(r.right()))), int(math.Min(float64(c.buf.h), math.Ceil(r.bottom())))
+		if x1 > x0 && y1 > y0 {
+			call(pBitBlt, dc, uintptr(x0), uintptr(y0), uintptr(x1-x0), uintptr(y1-y0), c.buf.dc, uintptr(x0), uintptr(y0), srccopy)
+		}
+	}
 }
 
-var pScreenToClient = user32.NewProc("ScreenToClient")
+// pix: a canvas' pixels as a Go slice (the DIB memory itself).
+func pix(c *Canvas) []uint32 {
+	if c == nil || c.bits == 0 {
+		return nil
+	}
+	return unsafe.Slice((*uint32)(unsafe.Pointer(c.bits)), c.w*c.h)
+}
+
+var gpDrawImageRectRect = gdiplus.NewProc("GdipDrawImageRectRect")
+
+// withCfg on the UI thread while Cinema holds the settings runs at once instead of waiting
+func init() { threadID = func() uint64 { return uint64(call(pGetCurrentThreadId)) } }
+
+func fsCapture(h uintptr, on bool) {
+	if on {
+		call(pSetCapture, h)
+	} else {
+		call(pReleaseCapture)
+	}
+}
+
+func fsInFront(f *FullView) bool { return call(pGetForegroundWnd) == f.hwnd }
+func showCursor(on bool) {
+	if on {
+		call(pSetCursor, call(pLoadCursorW, 0, 32512))
+	} else {
+		call(pSetCursor, 0)
+	}
+}

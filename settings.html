@@ -305,8 +305,7 @@ html[data-theme=light] input[type=range]{accent-color:var(--acc)}
 html[data-theme=light] .pill{background:#f0f0f4}
 .themebtn{margin-left:auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--line2);background:var(--card);display:grid;place-items:center;cursor:pointer;font-size:15px}
 .themebtn:hover{border-color:var(--acc)}
-/* pictures scrolled out of sight stop moving (and stop costing anything) */
-.offscreen,.offscreen *{animation-play-state:paused!important}
+@keyframes blob{0%{border-radius:47% 53% 42% 58%/52% 44% 56% 48%}50%{border-radius:58% 42% 55% 45%/43% 57% 45% 55%}100%{border-radius:42% 58% 48% 52%/57% 47% 53% 43%}}
 </style>
 <script>try{const t=localStorage.getItem("orbitTheme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
@@ -314,13 +313,13 @@ html[data-theme=light] .pill{background:#f0f0f4}
 <div id="app">
   <header class="top">
     <div class="logo"><svg class="logoimg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="lgA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3ee8ff"/><stop offset="1" stop-color="#8b5cff"/></linearGradient></defs><rect width="256" height="256" rx="58" fill="#0e0f1a"/><line x1="188.0" y1="128.0" x2="212.0" y2="128.0" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="187.1" y1="138.4" x2="218.5" y2="143.9" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="184.4" y1="148.5" x2="201.9" y2="154.9" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="180.0" y1="158.0" x2="206.5" y2="173.3" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="174.0" y1="166.6" x2="191.5" y2="181.3" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="166.6" y1="174.0" x2="191.2" y2="203.4" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="158.0" y1="180.0" x2="171.3" y2="203.0" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="148.5" y1="184.4" x2="157.1" y2="208.0" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="138.4" y1="187.1" x2="143.5" y2="216.1" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="128.0" y1="188.0" x2="128.0" y2="209.1" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="117.6" y1="187.1" x2="110.4" y2="227.8" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="107.5" y1="184.4" x2="101.8" y2="200.1" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="98.0" y1="180.0" x2="82.0" y2="207.7" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="89.4" y1="174.0" x2="79.2" y2="186.2" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="82.0" y1="166.6" x2="57.9" y2="186.8" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="76.0" y1="158.0" x2="49.7" y2="173.2" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="71.6" y1="148.5" x2="43.6" y2="158.7" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="68.9" y1="138.4" x2="44.7" y2="142.7" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="68.0" y1="128.0" x2="40.9" y2="128.0" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="68.9" y1="117.6" x2="41.4" y2="112.7" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="71.6" y1="107.5" x2="40.1" y2="96.0" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="76.0" y1="98.0" x2="49.7" y2="82.8" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="82.0" y1="89.4" x2="67.2" y2="77.0" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="89.4" y1="82.0" x2="69.0" y2="57.7" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="98.0" y1="76.0" x2="90.6" y2="63.3" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="107.5" y1="71.6" x2="93.1" y2="32.2" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="117.6" y1="68.9" x2="114.5" y2="51.3" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="128.0" y1="68.0" x2="128.0" y2="37.1" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="138.4" y1="68.9" x2="142.3" y2="47.0" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="148.5" y1="71.6" x2="158.4" y2="44.6" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="158.0" y1="76.0" x2="176.0" y2="44.8" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="166.6" y1="82.0" x2="183.1" y2="62.4" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="174.0" y1="89.4" x2="196.2" y2="70.7" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="180.0" y1="98.0" x2="198.8" y2="87.1" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="184.4" y1="107.5" x2="213.6" y2="96.8" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><line x1="187.1" y1="117.6" x2="214.1" y2="112.8" stroke="url(#lgA)" stroke-width="6" stroke-linecap="round"/><circle cx="128" cy="128" r="42" fill="none" stroke="#fff" stroke-width="9"/><circle cx="164" cy="98" r="8" fill="#fff"/></svg>Orbit</div><span class="pill" id="ver"></span>
-    <div class="npill"><div class="art" id="pillArt"></div><div class="tx"><b id="pillT">Nothing playing</b><span id="pillA">Play something on Spotify</span></div></div>
+    <div class="npill"><div class="art" id="pillArt"></div><div class="tx"><b id="pillT" translate="no">Nothing playing</b><span id="pillA" translate="no">Play something on Spotify</span></div></div>
     <div id="conn" class="conn">Connecting…</div>
     <button class="themebtn" id="themeBtn" title="Dark / light">☾</button>
   </header>
   <aside class="nav">
     <nav id="nav"></nav>
-    <div class="now"><div class="art" id="nowArt"></div><div class="txt"><div class="t" id="nowT">Nothing playing</div><div class="a" id="nowA">Play something on Spotify</div><div class="s" id="nowS"></div></div></div>
+    <div class="now"><div class="art" id="nowArt"></div><div class="txt"><div class="t" id="nowT" translate="no">Nothing playing</div><div class="a" id="nowA" translate="no">Play something on Spotify</div><div class="s" id="nowS"></div></div></div>
   </aside>
   <div class="content" id="content"><main id="main"></main><div class="side" id="side"></div></div>
 </div>
@@ -332,6 +331,95 @@ const TOKEN = new URLSearchParams(location.search).get("t") || "";
 let S = null;            // last state from the app
 let C = {};              // config
 const pending = {};
+
+/* ---------- language ---------- */
+// The page is written in English; L holds the chosen language (from Orbit, /api/i18n).
+// A watcher translates every text the page shows, so the builders below stay simple.
+let L = {}, LANG = "en", LOCALE = "en-US";
+const T = s => (s && L[s]) || s;
+const Tx = (s, x) => T(s).split("{x}").join(x);
+const plural = (v, n) => { const f = v.split("|"); n = Math.abs(n); let i;
+  if (LANG === "ru") i = n % 10 === 1 && n % 100 !== 11 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 1 : 2;
+  else i = n === 1 ? 0 : 1;
+  return f[Math.min(i, f.length - 1)]; };
+const Tn = (p, n) => { let v = T(p); if (v.includes("|")) v = plural(v, n); return v.split("{n}").join(String(n)); };
+const tStyle = n => n === "Orbit" ? T("Orbit·style") : T(n);
+const tWeather = n => n === "Clear" ? T("Clear·sky") : T(n);
+const upper = s => String(s).toLocaleUpperCase(LOCALE);
+let PATS = [];   // the "{n}" patterns as regular expressions
+function buildPats() {
+  PATS = Object.keys(L).filter(k => k.includes("{n}")).map(k => [new RegExp("^" + k.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\{n\}/g, "(-?[0-9]+(?:[.,][0-9]+)?)") + "$"), k]);
+}
+// tr: one shown text → the chosen language (or itself)
+// the Mac's own words for the few places that name Windows (then translated like the rest)
+const MACW = { "Start with Windows, quietly in the tray": "Open at login, quietly in the menu bar", "Windows language": "System language",
+  "Click the tray icon": "Click the menu bar icon", "WASAPI loopback (system audio)": "System audio", "Like Windows": "Like macOS",
+  "Appearance: Like Windows — click to switch": "Appearance: Like macOS — click to switch",
+  "This settings window in dark or light — or like Windows (Settings › Personalisation › Colours).": "This settings window in dark or light — or like macOS (System Settings › Appearance).",
+  "Menus, the full-screen view, the widgets and the dates. Windows language follows the language Windows is shown in.": "Menus, the full-screen view, the widgets and the dates. System language follows the language macOS is shown in." };
+let MAC = false;
+function tr(t) {
+  if (MAC && MACW[t]) t = MACW[t];
+  if (!t || LANG === "en") return t;
+  if (L[t]) return L[t];
+  for (const [re, k] of PATS) { const m = t.match(re); if (m) return Tn(k, m[1].includes(".") || m[1].includes(",") ? m[1] : +m[1]); }
+  if (t.includes(" · ")) { const parts = t.split(" · "); return parts.map(x => x === "Orbit" ? T("Orbit·style") : tr(x)).join(" · "); }
+  let m = t.match(/^(.*\S) ([0-9]+)$/);           // "Condensed 300"
+  if (m && L[m[1]]) return L[m[1]] + " " + m[2];
+  m = t.match(/^([^A-Za-z0-9]+\s+)(.+)$/);          // "◆  Diamond", "⛶  Go full screen"
+  if (m && L[m[2]]) return m[1] + L[m[2]];
+  m = t.match(/^(.+?)( ›)$/);                        // "Clock ›"
+  if (m && L[m[1]]) return L[m[1]] + m[2];
+  return t;
+}
+const SKIP = ".pv,.stage,[translate=no],code,script,style,select.fonts";
+const done = new WeakMap();   // text node → the text it was given
+function trText(n) {
+  const v = n.nodeValue;
+  if (!v || done.get(n) === v) return;
+  const t = v.trim();
+  if (t && /[A-Za-z]/.test(t)) {
+    const r = tr(t);
+    if (r !== t) { const a = v.indexOf(t); n.nodeValue = v.slice(0, a) + r + v.slice(a + t.length); }
+  }
+  done.set(n, n.nodeValue);
+}
+function trEl(el) {
+  if ((LANG === "en" && !MAC) || !el || el.nodeType !== 1 || el.closest(SKIP)) return;
+  if (el.matches("li,p") && el.querySelector("b")) {     // a sentence with bold words: translated whole
+    const k = L["HTML:" + el.innerHTML.trim()];
+    if (k) el.innerHTML = k.replace(/^HTML:/, "");
+  }
+  for (const a of ["title", "placeholder", "aria-label"]) if (el.hasAttribute(a)) { const v = el.getAttribute(a), r = tr(v); if (r !== v) el.setAttribute(a, r); }
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, { acceptNode: x => x.nodeType === 1 && x.matches(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  for (let x = w.nextNode(); x; x = w.nextNode()) {
+    if (x.nodeType === 3) trText(x);
+    else {
+      if (x.matches("li,p") && x.querySelector("b")) { const k = L["HTML:" + x.innerHTML.trim()]; if (k) x.innerHTML = k.replace(/^HTML:/, ""); }
+      for (const a of ["title", "placeholder", "aria-label"]) if (x.hasAttribute(a)) { const v = x.getAttribute(a), r = tr(v); if (r !== v) x.setAttribute(a, r); }
+    }
+  }
+}
+let trObs = null;
+function startTranslating() {
+  if ((LANG === "en" && !MAC) || trObs) return;
+  trEl(document.body);
+  trObs = new MutationObserver(ms => { for (const m of ms) {
+    if (m.type === "attributes") { const e = m.target, v = e.getAttribute(m.attributeName); if (v && !e.closest(SKIP)) { const r = tr(v); if (r !== v) e.setAttribute(m.attributeName, r); } }
+    else if (m.type === "characterData") { const n = m.target; if (n.parentElement && !n.parentElement.closest(SKIP)) trText(n); }
+    else for (const n of m.addedNodes) { if (n.nodeType === 3) { if (n.parentElement && !n.parentElement.closest(SKIP)) trText(n); } else trEl(n); }
+  } });
+  trObs.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["title", "placeholder", "aria-label"] });
+}
+async function loadLang() {
+  try {
+    const r = await api("/api/i18n");
+    LANG = r.lang || "en"; L = r.dict || {}; MAC = r.platform === "darwin";
+    LOCALE = { tr: "tr-TR", ru: "ru-RU" }[LANG] || "en-US";
+    document.documentElement.lang = LANG;
+    buildPats();
+  } catch (e) {}
+}
 
 const api = (path, body) => fetch(path + "?t=" + encodeURIComponent(TOKEN), body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {})
   .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); });
@@ -419,6 +507,8 @@ const PV = {
   "Wave": `<div><span style="position:relative;top:-4px">every</span> <span style="position:relative;top:2px">road</span> <span class="acc" style="position:relative;top:5px">I</span> <span style="position:relative;top:0;opacity:.4">take</span></div>`,
   "Glitch": `<div style="text-shadow:-2px 0 #ff2a55,2px 0 #22e5ff">night <span style="position:relative;left:3px">decide</span></div>`,
   "Decode": `<div>Turn <span class="acc">i#</span> <span style="opacity:.25">%P &N8</span></div>`,
+  "Split-flap": `<div style="display:flex;gap:2px;justify-content:center">${[..."TURN UP"].map((c, i) => `<b style="display:inline-block;width:13px;height:19px;line-height:19px;font-size:12px;text-align:center;background:linear-gradient(#26262c 50%,#141418 50%);border-radius:2px;color:${i < 4 ? "var(--acc)" : "#fff"};box-shadow:inset 0 -1px 0 #0008">${c === " " ? "" : c}</b>`).join("")}</div>`,
+  "LED board": `<div style="background:#050506;border-radius:5px;padding:4px 6px;color:var(--acc);font:700 13px/1 monospace;letter-spacing:2px;text-shadow:0 0 6px var(--acc);background-image:radial-gradient(#ffffff14 1px,transparent 1.3px);background-size:4px 4px">TURN IT UP ▸</div>`,
   "Highlighter": `<div><span style="background:var(--acc,#e8b04a);color:#111;border-radius:3px;padding:0 2px">Turn it</span> up and</div>`,
   "Echo": `<div style="position:relative"><span class="acc" style="position:absolute;left:38px;top:-12px;opacity:.15">up</span><span class="acc" style="position:absolute;left:38px;top:-6px;opacity:.3">up</span>Turn it <span class="acc">up</span> <span style="opacity:.2">and</span></div>`,
   "Orbit": `<div><span style="display:inline-block;transform:rotate(-14deg) translateY(6px)">every</span> <span style="display:inline-block">road</span> <span class="acc" style="display:inline-block;transform:rotate(14deg) translateY(6px)">take</span></div>`,
@@ -526,7 +616,7 @@ function updatePreview() {
         if (!lit(s)) { svg += `<circle cx="${x}" cy="${y}" r="1.4" fill="${col}" fill-opacity=".25"/>`; return; }
         if (r === cur && !done) { svg += `<g class="starpop" style="transform-origin:${x}px ${y}px"><circle cx="${x}" cy="${y}" r="15" fill="none" stroke="${acc}" stroke-width="1.2"/>${starSVG(sh, x, y, 11, col)}</g><text x="${x}" y="${y + 34}" fill="${col}" font-size="19" font-weight="800" text-anchor="middle" style="font-family:inherit">${esc(label)}</text>`; return; }
         svg += starSVG(sh, x, y, 5, col) + (label ? `<text x="${x}" y="${y + 17}" fill="${col}" fill-opacity=".85" font-size="10" text-anchor="middle" style="font-family:inherit">${esc(label)}</text>` : ""); });
-      if (done) svg += `<text x="${W - 30}" y="${Hh - 6}" fill="${acc}" fill-opacity=".7" font-size="9" letter-spacing="2" text-anchor="end">${esc(sky.Name.toUpperCase())}</text>`;
+      if (done) svg += `<text x="${W - 30}" y="${Hh - 6}" fill="${acc}" fill-opacity=".7" font-size="9" letter-spacing="2" text-anchor="end">${esc(upper(T(sky.Name)))}</text>`;
       html = svg + "</svg>"; break;
     }
     case "Bouncing": html = `<div class="bounce-row" style="position:relative;padding-top:1.1em">${words.map((x, i) => `<span data-w="${i}" style="display:inline-block;${i < pvWord ? grad : i === pvWord ? "color:" + acc + ";animation:spring .34s ease-out" : "opacity:.45"}">${up(x)}</span>`).join(" ")}<i class="ball" style="background:${acc};box-shadow:0 0 10px ${acc}"></i></div>`; break;
@@ -543,6 +633,11 @@ function updatePreview() {
     case "Echo": html = `<div>${words.map((x, i) => i === pvWord ? `<span style="position:relative;color:${acc}"><span style="position:absolute;left:0;top:-.5em;opacity:.15">${up(x)}</span><span style="position:absolute;left:0;top:-.25em;opacity:.3">${up(x)}</span>${up(x)}</span>` : `<span style="${i < pvWord ? grad : "opacity:.18"}">${up(x)}</span>`).join(" ")}</div>`; break;
     case "Orbit": { const n = words.length; html = `<div style="padding-top:.4em">${words.map((x, i) => { const a = (i - (n - 1) / 2) * 9; return `<span style="display:inline-block;transform:translateY(${Math.abs(a) * 0.9}px) rotate(${a}deg);${i > pvWord ? "opacity:0" : i === pvWord ? "color:" + acc : grad}">${up(x)}</span>`; }).join(" ")}</div>`; break; }
     case "Spotlight": html = `<div>${words.map((x, i) => i === pvWord ? `<span style="display:inline-block;transform:scale(1.12);color:${acc}">${up(x)}</span>` : `<span style="opacity:${Math.max(.1, 1 - Math.abs(i - pvWord) * .3)}">${up(x)}</span>`).join(" ")}</div>`; break;
+    case "Split-flap": { const g = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", line = words.map(up).join(" "), t = (Date.now() - pvFlapAt) / 1000;
+      html = `<div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;max-width:560px">${[...line].map((c, k) => { const flips = 3 + (k * 7 % 5), e = t - k * .028, done = e >= flips * .055, ch = c === " " ? "" : done ? c : e < 0 ? "" : g[(k * 13 + Math.floor(e / .055) * 7) % g.length], wi = line.slice(0, k).split(" ").length - 1;
+        return `<b style="display:inline-block;width:.66em;height:1.06em;line-height:1.06em;text-align:center;background:linear-gradient(#26262c 49%,#000 49% 52%,#16161a 52%);border-radius:.08em;color:${wi === pvWord ? acc : wi < pvWord ? textHex() : textHex() + "9e"}">${esc(ch)}</b>`; }).join("")}</div>`; break; }
+    case "LED board": { const line = words.map(up).join("  "), shift = Math.max(0, pvWord) * 3;
+      html = `<div style="width:560px;max-width:100%;overflow:hidden;background:#050506;border-radius:8px;padding:6px 10px;border:1px solid #fff2;background-image:radial-gradient(${acc}22 1.2px,transparent 1.6px);background-size:7px 7px"><div style="white-space:nowrap;font:800 .8em/1.25 'Segoe UI',sans-serif;letter-spacing:.12em;color:${acc};text-shadow:0 0 8px ${acc};transform:translateX(${40 - shift * 6}%);transition:transform .4s linear">${esc(line)}</div></div>`; break; }
     default: html = prev + `<div>${words.map((_, i) => w(i)).join(" ")}</div>`;
   }
   box.innerHTML = html;
@@ -557,13 +652,14 @@ function updatePreview() {
     }
   }
 }
-setInterval(() => { if (S && ["Wave", "Decode"].includes(S.styles[C.LyricsStyle])) updatePreview(); }, 70);
+let pvFlapAt = Date.now(), pvFlapLine = -1;
+setInterval(() => { if (S && ["Wave", "Decode", "Split-flap"].includes(S.styles[C.LyricsStyle])) { if (pvFlapLine !== pvLine) { pvFlapLine = pvLine; pvFlapAt = Date.now(); } updatePreview(); } }, 70);
 setInterval(() => { if (!S) return; pvWord++; if (pvWord >= SAMPLE[pvLine].split(" ").length + 2) { pvWord = 0; pvLine = pvLine === 1 ? 2 : 1; } updatePreview(); }, 420);
 
 /* ---------- pages ---------- */
 const PAGES = [
   { id: "widgets", ico: "▦", title: "Widgets", build: pageWidgets },
-  { id: "fullscreen", ico: "⛶", title: "Full screen", build: pageFull },
+  { id: "fullscreen", ico: "⛶", title: "Cinema", build: pageFull },
   { id: "layout", ico: "⤧", title: "Arrange", build: pageLayout },
   { id: "perf", ico: "⚡", title: "Performance", build: pagePerf },
   { id: "general", ico: "⚙", title: "System", build: pageGeneral },
@@ -620,7 +716,11 @@ function discHTML(style, size, spin) {
     case 3: bg = `radial-gradient(circle at 22% 30%,#fff 0 6%,transparent 6.5%),radial-gradient(circle at 70% 24%,#111 0 5%,transparent 5.5%),radial-gradient(circle at 78% 66%,#fff 0 4%,transparent 4.5%),radial-gradient(circle at 30% 76%,${mix(col, "#000000", .5)} 0 7%,transparent 7.5%),radial-gradient(circle at 55% 48%,#fff 0 2%,transparent 2.5%),${grooves},${mix(col, "#ffffff", .15)}`; break;
     case 4: bg = `${grooves},conic-gradient(from 30deg,${col},${mix(col, "#ffffff", .6)},${mix(col, "#000000", .4)},${col},${mix(col, "#ffffff", .45)},${col})`; break;
     case 5: bg = `${grooves},${col}44`; extra = `border:2px solid ${mix(col, "#ffffff", .5)}aa;`; break;
-    default: bg = `${grooves},radial-gradient(circle at 35% 30%,#ffe7a0,#b8892b 55%,#6e5010)`;
+    case 6: bg = `${grooves},radial-gradient(circle at 35% 30%,#ffe7a0,#b8892b 55%,#6e5010)`; break;
+    case 7: bg = `radial-gradient(circle,transparent 0 55%,#0000 55%),conic-gradient(from 20deg,#ff6ad5aa,#c774e8aa,#6ab7ffaa,#5effc8aa,#fff36aaa,#ff9a6aaa,#ff6ad5aa,#c774e8aa,#6ab7ffaa,#5effc8aa,#fff36aaa,#ff9a6aaa,#ff6ad5aa),radial-gradient(circle,#eef2f8,#b7bdc7)`; extra = "box-shadow:inset 0 0 0 1px #fff8;"; break;
+    case 8: bg = `radial-gradient(circle,transparent 0 33%,${col} 33.5% 34.5%,transparent 35% 40%,${col} 40.5% 41.5%,transparent 42% 47%,${col} 47.5% 48.5%,transparent 49%),${grooves},#08080a`; extra = `box-shadow:0 0 10px ${col}88,inset 0 0 8px ${col}66;`; break;
+    case 9: bg = `${grooves},linear-gradient(180deg,${mix(col, "#ffffff", .62)} 50%,${mix(col, "#000000", .2)} 50%)`; break;
+    default: bg = `${grooves},radial-gradient(circle,#2c6b46,#0d1a12)`; extra = "box-shadow:0 0 12px #7cffb255;";
   }
   const spd = C.SpinRPM ? (60 / C.SpinRPM).toFixed(2) + "s" : "0s";
   return `<div class="disc ${spin && C.SpinRPM && C.FPS ? "spin" : ""}" style="width:${size}px;height:${size}px;background:${bg};--spd:${spd};${extra}">${label ? `<div class="lbl" style="${coverBG()}"></div>` : ""}<div class="hole"></div></div>`;
@@ -669,6 +769,12 @@ function visHTML(style, big) {
     case 3: return `<div class="vis">${bars("mirror")}</div>`;
     case 4: { const lv = [6, 8, 5, 7, 4, 6, 3, 5, 2, 4, 3]; let cells = ""; lv.forEach(l => { for (let r = 7; r >= 0; r--) cells += `<i class="${r < l ? "on" : ""}" style="--c:${mix(a, b, r / 7)}"></i>`; });
       return `<div class="vis"><div class="blocks" style="transform:scale(${k * 1.3})">${cells}</div></div>`; }
+    case 6: { let d = ""; for (let i = 0; i < 46; i++) { const an = i * 2.4 + (i % 3), rr = (50 + (i * 37 % 23) + (i % 5 ? 0 : 12)) * k, sz = (2 + i % 3) * k;
+        d += `<i style="position:absolute;left:50%;top:50%;width:${sz}px;height:${sz}px;border-radius:50%;background:${[a, b, mix(a, b, .5), "#fff"][i % 4]};transform:translate(-50%,-50%) rotate(${an}rad) translateX(${rr}px);box-shadow:0 0 ${4 * k}px ${a}"></i>`; }
+      return `<div class="vis" style="position:relative">${d}${cov}</div>`; }
+    case 7: { const pts = Array.from({ length: 61 }, (_, i) => { const t = i / 60; return [t * 200, 40 - (Math.sin(t * 25) * .55 + Math.sin(t * 61) * .25) * 26]; }).map(([x, y], i) => (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1)).join("");
+      return `<div class="vis"><svg viewBox="0 0 200 80" preserveAspectRatio="none" style="background:#020a05;border-radius:8px;border:1px solid #39ff7a55;background-image:linear-gradient(#39ff7a14 1px,transparent 1px),linear-gradient(90deg,#39ff7a14 1px,transparent 1px);background-size:20px 13.3px"><path d="${pts}" fill="none" stroke="#39ff7a" stroke-width="6" opacity=".18"/><path d="${pts}" fill="none" stroke="#39ff7a" stroke-width="1.8"/></svg></div>`; }
+    case 8: return `<div class="vis" style="position:relative"><div style="position:absolute;left:50%;top:50%;width:${118 * k}px;height:${108 * k}px;transform:translate(-50%,-50%);border-radius:47% 53% 42% 58%/52% 44% 56% 48%;background:linear-gradient(160deg,${a}cc,${b}cc);box-shadow:0 0 ${18 * k}px ${a}88;animation:blob 6s ease-in-out infinite alternate"></div>${cov.replace('class="cv" style="', 'class="cv" style="position:relative;z-index:1;')}</div>`;
     default: { const pts = Array.from({ length: 33 }, (_, i) => { const t = i / 32, y = Math.sin(t * Math.PI) * (Math.sin(t * 19) * .5 + .5) * 30; return [t * 200, y]; });
       const up = pts.map(([x, y], i) => (i ? "L" : "M") + x.toFixed(1) + " " + (40 - y).toFixed(1)).join(""), dn = pts.map(([x, y], i) => (i ? "L" : "M") + x.toFixed(1) + " " + (40 + y * .6).toFixed(1)).join("");
       return `<div class="vis"><svg viewBox="0 0 200 80" preserveAspectRatio="none"><defs><linearGradient id="wg${big ? 1 : 0}"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><path d="${up}" fill="none" stroke="url(#wg${big ? 1 : 0})" stroke-width="2"/><path d="${dn}" fill="none" stroke="url(#wg${big ? 1 : 0})" stroke-width="1.5" opacity=".5"/></svg></div>`; }
@@ -685,7 +791,7 @@ function refreshLive() {
 }
 
 /* ---------- summary text ---------- */
-const rpmName = v => !v ? "stopped" : Math.abs(v - 33.33) < 0.2 ? "33⅓ rpm" : (Math.round(v * 10) / 10) + " rpm";
+const rpmName = v => !v ? T("stopped") : Math.abs(v - 33.33) < 0.2 ? Tn("{n} rpm", "33⅓") : Tn("{n} rpm", Math.round(v * 10) / 10);
 function winfo(name) { return (S.widgets && S.widgets[name]) || { x: 50, y: 50, scale: 1, onTop: false, locked: false, opacity: 1 }; }
 const whereName = name => winfo(name).onTop ? "Always on top" : "On the desktop";
 function subtitle(name) {
@@ -693,7 +799,7 @@ function subtitle(name) {
   if (!on) return name === "glow" ? "Off" : "Not on the desktop";
   if (name === "glow") return S.lists.glowStyles[C.GlowStyle] + " · " + (C.GlowMode ? "steady rhythm" : "with the music");
   const lock = winfo(name).locked ? " · Locked" : "";
-  if (name === "lyrics") return S.styles[C.LyricsStyle] + " · " + whereName(name) + lock;
+  if (name === "lyrics") return tStyle(S.styles[C.LyricsStyle]) + " · " + whereName(name) + lock;
   if (name === "clock") return S.lists.clockStyles[C.ClockStyle] + " · " + whereName(name) + lock;
   if (name === "weather") return (C.WeatherCity ? C.WeatherCity.split(", ")[0] : "Pick a city") + " · " + whereName(name) + lock;
   if (name === "vinyl") return S.discs[C.DiscStyle] + " · " + rpmName(C.SpinRPM) + " · " + whereName(name) + lock;
@@ -713,7 +819,7 @@ function updateSide() {
   else if (n === "weather") { stage = `<div class="stage" data-weather="cur" style="padding:8px">${weatherHTML(1, false)}</div>`; rows = [["Place", C.WeatherCity || "—"], ["Style", S.lists.weatherStyles[C.WeatherStyle]], ["Units", C.WeatherF ? "°F" : "°C"], ["Updated", S.weather && S.weather.ok ? DF.time.format(new Date(S.weather.updated)) : "—"]]; }
   else if (n === "glow") { stage = `<div class="stage" style="padding:16px;background:#0b0b10">${glowScreen("cur", false)}</div>`; rows = [["Style", S.lists.glowStyles[C.GlowStyle]], ["Rhythm", S.lists.glowModes[C.GlowMode]], ["Where", S.lists.glowWhere[C.GlowWhere]], ["Colour", S.lists.glowColors[C.GlowColorMode]], ["Brightness", pct(C.GlowBright)]];
     side.innerHTML = stage + `<div class="summary">${rows.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>`; return; }
-  else { stage = `<div class="stage"><div style="font:700 22px '${esc(C.FontName)}',Consolas,monospace;color:${textHex()};text-align:center;padding:10px">${esc(caseText("City lights"))} <span style="color:${accentHex()}">${esc(caseText("fading"))}</span></div></div>`; rows = [["Style", S.styles[C.LyricsStyle]], ["Motion", S.motions[C.Motion]], ["Theme", S.themes[C.Theme].name], ["Font", C.FontName]]; }
+  else { stage = `<div class="stage"><div style="font:700 22px '${esc(C.FontName)}',Consolas,monospace;color:${textHex()};text-align:center;padding:10px">${esc(caseText("City lights"))} <span style="color:${accentHex()}">${esc(caseText("fading"))}</span></div></div>`; rows = [["Style", tStyle(S.styles[C.LyricsStyle])], ["Motion", S.motions[C.Motion]], ["Theme", S.themes[C.Theme].name], ["Font", C.FontName]]; }
   rows.push(["Placement", whereName(n)], ["Size", size], ["Opacity", Math.round((w.opacity || 1) * 100) + "%"]);
   side.innerHTML = stage + `<div class="summary">${rows.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>`;
 }
@@ -731,7 +837,6 @@ function pageWidgets() {
     ["glow", "Screen glow", "ShowGlow", () => `<div style="width:78%;height:76%">${glowScreen("cur", false)}</div>`],
   ];
   const grid = h("div", { class: "wgrid" });
-  const mac = S.platform === "darwin"; // (full screen isn't on the Mac yet)
   for (const [id, title, key, pv] of cards) {
     const stage = h("div", { class: "stage" }); stage.innerHTML = pv();
     const sub = h("small", {}, subtitle(id));
@@ -739,12 +844,11 @@ function pageWidgets() {
     const sw = h("label", { class: "sw", on: { click: e => e.stopPropagation() } }, inp, h("span"));
     grid.append(h("div", { class: "wbig", "data-w": id, on: { click: () => go(id) } }, stage, h("div", { class: "foot" }, h("div", { class: "l" }, h("b", {}, title), sub), sw)));
   }
-  if (mac) return [h("h3", { style: "margin-top:0" }, "Widgets"), h("p", { class: "lede" }, "Everything Orbit puts on your desktop. Pick one to customize it. (Full screen is coming to the Mac.)"), grid];
   const fst = h("div", { class: "stage fsmini", style: "position:relative;overflow:hidden" });
-  setTimeout(() => { fst.innerHTML = C.FsKind === 1 ? skinHTML(140) : fsHTML(140); }, 0);
+  setTimeout(() => { fst.innerHTML = fsPreview(140); }, 0);
   const goFs = h("button", { class: "btn primary", "data-act": "fullscreenGo", on: { click: e => { e.stopPropagation(); action("fullscreen", true).then(() => toast("Full screen — Esc to leave")); } } }, "Go");
   grid.append(h("div", { class: "wbig", "data-w": "fullscreen", on: { click: () => go("fullscreen") } }, fst,
-    h("div", { class: "foot" }, h("div", { class: "l" }, h("b", {}, "Full screen"), h("small", {}, (C.FsKind === 1 ? "Desktop skin · " + S.lists.skinBgs[C.SkinBg] : S.lists.fsModes[C.FsMode] + " · " + S.lists.fsBgs[C.FsBg]) + " · Ctrl+Alt+F")), goFs)));
+    h("div", { class: "foot" }, h("div", { class: "l" }, h("b", {}, "Full screen"), h("small", {}, "Cinema · " + S.lists.stages[C.FsStage] + " · Ctrl+Alt+F")), goFs)));
   return [h("h3", { style: "margin-top:0" }, "Widgets"), h("p", { class: "lede" }, "Everything Orbit puts on your desktop. Pick one to customize it — or take the whole screen."), grid];
 }
 
@@ -823,8 +927,8 @@ function pageLyrics() {
   const grid = h("div", { class: "grid", id: "styles" });
   S.styles.forEach((n, i) => {
     const pv = h("div", { class: "pv" }); pv.innerHTML = PV[n] || n;
-    grid.append(h("div", { class: "card" + (C.LyricsStyle === i ? " on" : ""), "data-i": i, title: n,
-      on: { click: () => { set("LyricsStyle", i, true); [...grid.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); const sb = document.getElementById("starBox"); if (sb) sb.style.display = n === "Constellation" ? "" : "none"; } } }, pv, h("div", { class: "nm" }, n)));
+    grid.append(h("div", { class: "card" + (C.LyricsStyle === i ? " on" : ""), "data-i": i, title: tStyle(n),
+      on: { click: () => { set("LyricsStyle", i, true); [...grid.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); const sb = document.getElementById("starBox"); if (sb) sb.style.display = n === "Constellation" ? "" : "none"; } } }, pv, h("div", { class: "nm" }, tStyle(n))));
   });
   const custom = h("div", { id: "customColors", style: C.Theme === S.themes.length - 1 ? "" : "display:none" }, color("TextColor", "Text colour"), color("AccentColor", "Accent colour"));
   return [crumb(), h("h1", {}, "Lyrics"),
@@ -847,7 +951,7 @@ function pageLyrics() {
     h("div", { style: "height:8px" }),
     slider("TextSize", "Text size", 14, 160, 1, v => v + " px", "At 1080p — scales with your screen. Long lines shrink to fit."),
     toggle("Bold", "Bold"),
-    slider("LyricsWidth", "Maximum line width", 20, 90, 1, v => v + "% of screen"),
+    slider("LyricsWidth", "Maximum line width", 20, 90, 1, v => Tn("{n}% of screen", v)),
     ...sec("Effect"), chips("Effect", S.effects),
     h("div", { style: "height:8px" }),
     slider("GlowAmount", "Effect strength", 0, 2, 0.05, pct),
@@ -886,12 +990,12 @@ function presetChips(key, list, after) {
   mark(); return wrap;
 }
 function pageVinyl() {
-  const coloured = i => i >= 2 && i <= 5;
+  const coloured = i => (i >= 2 && i <= 5) || i === 8 || i === 9;
   const tiles = h("div", { class: "tiles", "data-key": "DiscStyle" });
   const mine = h("div", { id: "discMine", style: C.DiscColorMode === 2 ? "" : "display:none" }, color("DiscColor", "Record colour"));
   const colBox = h("div", { style: coloured(C.DiscStyle) ? "" : "display:none" }, ...sec("Colour", "Coloured, splatter, marble and clear records take this colour; a picture disc prints the album cover across the whole record."),
     chips("DiscColorMode", S.discColors, "", i => { mine.style.display = i === 2 ? "" : "none"; refreshLive(); }), mine);
-  const blurbs = ["The cover is the record", "Classic, cover as label", "Solid colour vinyl", "Paint splashes", "Swirled like stone", "See-through", "Shiny gold"];
+  const blurbs = ["The cover is the record", "Classic, cover as label", "Solid colour vinyl", "Paint splashes", "Swirled like stone", "See-through", "Shiny gold", "Rainbow that flashes on the bass", "Glowing rings", "Half and half", "Phosphor green"];
   S.discs.forEach((n, i) => {
     const pv = h("div", { class: "pv", "data-disc": i, "data-size": 52, "data-spin": "0" }); pv.innerHTML = discHTML(i, 52, false);
     tiles.append(h("div", { class: "tile" + (C.DiscStyle === i ? " on" : ""), "data-i": i, on: { click: () => {
@@ -912,9 +1016,12 @@ function pageVinyl() {
         lt.append(h("div", { class: "tile" + (C.VinylLayout === i ? " on" : ""), "data-i": i, on: { click: () => { set("VinylLayout", i, true); [...lt.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); } } }, pv, h("div", { class: "nm" }, n), h("small", {}, ["Anywhere, whole record", "Half a record in the corner"][i]))); });
       return lt; })(),
     ...sec("Record"), tiles, colBox,
-    ...sec("View", "Song wheel fans the song playing and the ones before it around the record's edge."), view,
+    ...sec("View", "Song wheel: the song playing in the middle, highlighted — the next songs above it, the ones that played below."), view,
+    h("div", { style: "height:6px" }),
+    chips("VinylNext", ["Up next", "Recently played"]),
+    h("p", { class: "hint" }, "Up next shows the songs that play after this one. Windows only tells apps what plays now, so this reads your real Spotify queue: connect your Spotify account once in Cinema › Spotify queue (Spotify allows this on Premium). Until then the wheel shows what you played."),
     h("div", { style: "height:8px" }),
-    slider("ListCount", "Songs before it on the wheel", 0, 6, 1, v => v + (v === 1 ? " song" : " songs")),
+    slider("ListCount", "Songs around it on the wheel", 0, 6, 1, v => v + (v === 1 ? " song" : " songs"), "Up next: half above (coming next), half below (played). 4 = 2 and 2."),
     ...sec("Speed", "Revolutions per minute, like the real thing — or slow it right down."),
     presetChips("SpinRPM", [[12, "Slow"], [33.33, "33⅓"], [45, "45"], [78, "78"]], refreshLive),
     h("div", { style: "height:8px" }),
@@ -923,10 +1030,16 @@ function pageVinyl() {
     toggle("GrooveLight", "Grooves light up with the music", "Bass on the outside, highs near the label"),
     slider("DiscGlow", "Glow around the record", 0, 2, 0.05, pct, "Breathes with the bass"),
     toggle("Shine", "Light reflections", "Two soft highlights that stay still while the record turns"),
+    toggle("Worn", "Old, well-played record", "Dust and fine scratches on the record, and little sparkles where the needle runs over them"),
     ...sec("Behaviour"),
+    toggle("SwapAnim", "Change records with the song", "When the song changes the needle lifts, the record is changed for the next song's, and the needle drops back on. It waits for the new cover, so the new record never shows the wrong one"),
+    chips("SwapStyle", ["Lift & drop", "Sleeve"]),
+    h("p", { class: "hint" }, "Lift & drop: the record lifts off and fades away, the next one comes down and settles. Sleeve: the album sleeve slides over the record and takes it away, the next sleeve brings the new one."),
+    toggle("Scratch", "Scratch: turn the record by hand", "Hold the record on your desktop and turn it: the song goes forward or back with it, the time shows on the record. Move it by the song wheel or the card, or in arrange mode (Ctrl+Alt+E)"),
+    slider("ScratchSec", "One full turn", 2, 30, 1, v => v + " seconds of the song"),
     toggle("ShowArm", "Needle", "A tonearm that follows the song from the edge to the label"),
     toggle("ArmLift", "Needle drops and lifts", "Swings onto the record when the music starts and lifts off when it stops"),
-    toggle("ClickPlay", "Click to play or pause", "Click the record on your desktop to pause the song, and again to carry on. Dragging still moves it, and a double-click switches its colours"),
+    toggle("ClickPlay", "Click to play or pause", "Click the record on your desktop to pause the song, and again to carry on. Dragging the song wheel still moves it, and a double-click switches its colours"),
     ...sec("Corner", "Which corner the record sits in. On the right side the song wheel, card and needle flip to the other side."), cornerPicker(),
     ...ambientSection("vinyl"),
     ...placement("vinyl")];
@@ -940,7 +1053,7 @@ function cornerPicker() {
 
 /* ---------- Visualizer ---------- */
 function pageHalo() {
-  const blurbs = ["Bars around the cover", "A line that wobbles", "Classic spectrum", "Mirrored both ways", "LED meter", "Smooth waveform"];
+  const blurbs = ["Bars around the cover", "A line that wobbles", "Classic spectrum", "Mirrored both ways", "LED meter", "Smooth waveform", "Burst out on every kick", "Green phosphor trace", "A blob the music shapes"];
   const tiles = h("div", { class: "tiles", "data-key": "HaloStyle" });
   S.vis.forEach((n, i) => {
     const pv = h("div", { class: "pv", "data-vis": i }); pv.innerHTML = visHTML(i, false);
@@ -982,6 +1095,32 @@ const CLOCK_FONTS = [
   ["Georgia,Cambria,'Times New Roman',serif"], ["'Cascadia Mono',Consolas,'Courier New',monospace"], ["'Ink Free','Segoe Print','Segoe Script',cursive"]];
 const NUMW = ["twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "quarter", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
 function minuteWords(m) { return m === 15 ? "quarter" : m === 30 ? "half" : m <= 20 ? NUMW[m] : m === 25 ? "twenty-five" : "twenty-" + NUMW[m - 20]; }
+// the words clock as Orbit draws it: [small lead, line above, the hour, line under]
+function clockWordsIn(h, m) {
+  m = Math.floor((m + 2) / 5) * 5; if (m === 60) { m = 0; h++; }
+  const h12 = ((h % 12) + 12) % 12 || 12, nx = h12 % 12 + 1;
+  if (LANG === "tr") {
+    const card = ["", "bir", "iki", "üç", "dört", "beş", "altı", "yedi", "sekiz", "dokuz", "on", "on bir", "on iki"];
+    const acc = ["", "biri", "ikiyi", "üçü", "dördü", "beşi", "altıyı", "yediyi", "sekizi", "dokuzu", "onu", "on biri", "on ikiyi"];
+    const dat = ["", "bire", "ikiye", "üçe", "dörde", "beşe", "altıya", "yediye", "sekize", "dokuza", "ona", "on bire", "on ikiye"];
+    const mins = { 5: "beş", 10: "on", 15: "çeyrek", 20: "yirmi", 25: "yirmi beş" };
+    if (m === 0) return ["saat", "", card[h12], ""];
+    if (m === 30) return ["saat", "", card[h12], "buçuk"];
+    if (m < 30) return ["saat", "", acc[h12], mins[m] + " geçiyor"];
+    return ["saat", "", dat[nx], mins[60 - m] + " var"];
+  }
+  if (LANG === "ru") {
+    const card = ["", "час", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять", "десять", "одиннадцать", "двенадцать"];
+    const ord = ["", "первого", "второго", "третьего", "четвёртого", "пятого", "шестого", "седьмого", "восьмого", "девятого", "десятого", "одиннадцатого", "двенадцатого"];
+    const past = { 5: "пять минут", 10: "десять минут", 15: "четверть", 20: "двадцать минут", 25: "двадцать пять минут", 30: "половина" };
+    const to = { 5: "без пяти", 10: "без десяти", 15: "без четверти", 20: "без двадцати", 25: "без двадцати пяти" };
+    if (m === 0) return ["сейчас", "", card[h12], h12 === 1 ? "" : h12 <= 4 ? "часа" : "часов"];
+    if (m <= 30) return ["сейчас", past[m], ord[nx], ""];
+    return ["сейчас", to[60 - m], card[nx], ""];
+  }
+  const [top, hour] = clockWords(h, m);
+  return ["it's", top, hour, ""];
+}
 function clockWords(h, m) {
   m = Math.floor((m + 2) / 5) * 5; if (m === 60) { m = 0; h++; }
   const hr = h => NUMW[((h % 12) + 12) % 12];
@@ -990,9 +1129,13 @@ function clockWords(h, m) {
   return [minuteWords(60 - m) + " to", hr(h + 1)];
 }
 // date formatters are built once: making a new one on every call (toLocaleDateString) gets very slow
-const DF = { long: new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" }),
-  short: new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }),
-  day: new Intl.DateTimeFormat(undefined, { weekday: "short" }), time: new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }) };
+let DF = null;
+function buildDF() {
+  DF = { long: new Intl.DateTimeFormat(LOCALE, { weekday: "long", day: "numeric", month: "long" }),
+    short: new Intl.DateTimeFormat(LOCALE, { weekday: "short", day: "numeric", month: "short" }),
+    day: new Intl.DateTimeFormat(LOCALE, { weekday: "short" }), time: new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit" }) };
+}
+buildDF();
 function clockPaint() {
   const c0 = C.ClockColorMode === 1 ? C.ClockColor : C.ClockColorMode === 2 ? mix(visPair()[1], "#ffffff", .2) : C.ClockColor;
   const c1 = C.ClockColorMode === 1 ? C.ClockColor2 : C.ClockColorMode === 2 ? visPair()[0] : C.ClockColor;
@@ -1011,7 +1154,7 @@ function clockHTML(style, big) {
   const date = (C.ClockDateLong ? DF.long : DF.short).format(d);
   const al = ["flex-start", "center", "flex-end"][C.ClockAlign], ta = ["left", "center", "right"][C.ClockAlign];
   const base = `font-family:${fam};font-weight:${fw};letter-spacing:${ls};line-height:1;`;
-  const dateDiv = C.ClockDate && style !== 2 ? `<div style="${base}font-weight:600;font-size:${13 * k * 1.4}px;letter-spacing:.14em;text-transform:uppercase;margin-top:${8 * k}px;opacity:.85;${p.css}">${esc(date)}</div>` : "";
+  const dateDiv = C.ClockDate && style !== 2 ? `<div style="${base}font-weight:600;font-size:${13 * k * 1.4}px;letter-spacing:.14em;margin-top:${8 * k}px;opacity:.85;${p.css}">${esc(upper(date))}</div>` : "";
   const sfx = [C.ClockSeconds ? ss : "", ampm].filter(Boolean).join(" ");
   let body;
   switch (style) {
@@ -1024,8 +1167,8 @@ function clockHTML(style, big) {
       body = `<svg width="${sz}" height="${sz}" viewBox="0 0 100 100" style="overflow:visible;${C.ClockShadow ? "filter:drop-shadow(0 2px 3px #0009)" : ""}"><circle cx="50" cy="50" r="49" fill="none" stroke="${p.c0}" stroke-opacity=".18"/>${ticks}${hand(hr, 25, 3.4, p.c0)}${hand(mn, 37, 2.2, p.c0)}${C.ClockSeconds ? hand(sc, 41, .9, p.c1) : ""}<circle cx="50" cy="50" r="2" fill="${p.c0}"/></svg>`;
       break;
     }
-    case 4: { const [top, hour] = clockWords(d.getHours(), d.getMinutes());
-      body = `<div style="${base}font-size:${15 * k}px;opacity:.75;${p.css}">it's</div>${top ? `<div style="${base}font-size:${30 * k}px;${p.css}">${top}</div>` : ""}<div style="${base}font-size:${48 * k}px;font-weight:800;${p.css}">${hour}</div>`; break; }
+    case 4: { const [its, top, hour, after] = clockWordsIn(d.getHours(), d.getMinutes());
+      body = `<div style="${base}font-size:${15 * k}px;opacity:.75;${p.css}">${its}</div>${top ? `<div style="${base}font-size:${30 * k}px;${p.css}">${top}</div>` : ""}<div style="${base}font-size:${48 * k}px;font-weight:800;${p.css}">${hour}</div>${after ? `<div style="${base}font-size:${30 * k}px;${p.css}">${after}</div>` : ""}`; break; }
     default: body = `<div style="display:flex;align-items:flex-end;gap:${6 * k}px"><div style="${base}font-size:${96 * k}px;${p.css}">${hh}:${mm}</div>${sfx ? `<div style="${base}font-size:${24 * k}px;font-weight:700;margin-bottom:${10 * k}px;${p.css}">${sfx}</div>` : ""}</div>`;
   }
   return `<div style="display:flex;flex-direction:column;align-items:${al};text-align:${ta};width:100%;padding:0 ${big ? 40 : 6}px">${body}${dateDiv}</div>`;
@@ -1068,7 +1211,7 @@ function pageClock() {
     toggle("ClockShadow", "Shadow", "Keeps it readable on bright wallpapers", live),
     toggle("ClockGlow", "Glow", "A soft halo in the clock's colour", live),
     toggle("ClockPulse", "Pulse to the beat", "Swells and brightens a little on every kick, in step with the visualizer", live),
-    boolChips("ClockDateLong", ["Mon, 21 Sep", "Monday, 21 September"]),
+    boolChips("ClockDateLong", [DF.short.format(new Date(2026, 8, 21)), DF.long.format(new Date(2026, 8, 21))]),
     ...sec("Alignment", "Which side of its box the clock sits against."), chips("ClockAlign", S.lists.aligns, "", live),
     ...placement("clock")];
 }
@@ -1107,17 +1250,17 @@ function dayName(iso) { return DF.day.format(new Date(iso + "T12:00:00")); }
 function weatherHTML(style, big) {
   const w = S.weather || {}, k = big ? 1 : .42, txt = textHex();
   if (!w.ok) {
-    const msg = !C.WeatherCity ? "Pick a city below" : w.err ? esc(w.err) : "Loading weather for " + esc(C.WeatherCity) + "…";
+    const msg = !C.WeatherCity ? T("Pick a city below") : w.err ? esc(T(w.err)) : esc(Tx("Loading weather for {x}…", C.WeatherCity));
     return `<div style="display:flex;align-items:center;gap:${14 * k}px;opacity:.85">${wxIcon("cloudy", 70 * k)}<div style="font-size:${15 * k * 1.1}px;font-weight:600;color:${txt}">${msg}</div></div>`;
   }
   const card = C.WeatherCard > 0 && style !== 1 ? `background:linear-gradient(#1a1b24${Math.round(C.WeatherCard * 210).toString(16).padStart(2, "0")},#101118${Math.round(C.WeatherCard * 230).toString(16).padStart(2, "0")});border:1px solid #ffffff${Math.round(C.WeatherCard * 24).toString(16).padStart(2, "0")};border-radius:${20 * k}px;` : "";
-  const hl = w.days && w.days[0] ? `H ${tempStr(w.days[0].max)}  L ${tempStr(w.days[0].min)}` : "";
-  const det = C.WeatherDetails ? `<div style="font-size:${12 * k}px;opacity:.6;margin-top:${4 * k}px">Feels ${tempStr(w.feels)} · ${Math.round(w.humidity)}% · ${Math.round(w.wind)} ${w.unit === "F" ? "mph" : "km/h"}</div>` : "";
-  const place = esc((w.place || "").split(", ").filter((_, i, a) => a.length < 3 || i === 0 || i === a.length - 1).join(", ")).toUpperCase();
+  const hl = w.days && w.days[0] ? T("H %s  L %s").replace("%s", tempStr(w.days[0].max)).replace("%s", tempStr(w.days[0].min)) : "";
+  const det = C.WeatherDetails ? `<div style="font-size:${12 * k}px;opacity:.6;margin-top:${4 * k}px">${T("Feels %s  ·  %.0f%%  ·  %.0f %s").replace("%s", tempStr(w.feels)).replace("%.0f%%", Math.round(w.humidity) + "%").replace("%%%.0f", "%" + Math.round(w.humidity)).replace("%.0f", Math.round(w.wind)).replace("%s", T(w.unit === "F" ? "mph" : "km/h"))}</div>` : "";
+  const place = esc((w.place || "").split(", ").filter((_, i, a) => a.length < 3 || i === 0 || i === a.length - 1).join(", ")); const placeU = upper(place);
   const anim = C.WeatherAnimate && C.FPS ? "" : "wx-still";
-  if (style === 1) return `<div class="${anim}" style="display:flex;flex-direction:column;align-items:center;color:${txt};text-shadow:0 1px 3px #0007">${wxIcon(w.kind, 96 * k)}<div style="font-size:${46 * k}px;font-weight:300;line-height:1">${tempStr(w.temp)}</div><div style="font-size:${13 * k}px;font-weight:600;letter-spacing:.06em;margin-top:${6 * k}px;opacity:.8">${place} · ${esc(w.text).toUpperCase()}</div></div>`;
+  if (style === 1) return `<div class="${anim}" style="display:flex;flex-direction:column;align-items:center;color:${txt};text-shadow:0 1px 3px #0007">${wxIcon(w.kind, 96 * k)}<div style="font-size:${46 * k}px;font-weight:300;line-height:1">${tempStr(w.temp)}</div><div style="font-size:${13 * k}px;font-weight:600;letter-spacing:.06em;margin-top:${6 * k}px;opacity:.8">${placeU} · ${esc(upper(tWeather(w.text)))}</div></div>`;
   const days = style === 2 && w.days ? `<div style="display:flex;justify-content:space-around;border-top:1px solid #ffffff1a;margin-top:${12 * k}px;padding-top:${10 * k}px">${w.days.slice(1, 5).map(d => `<div style="display:flex;flex-direction:column;align-items:center;gap:${4 * k}px;font-size:${12 * k}px"><b style="opacity:.75">${esc(dayName(d.date))}</b>${wxIcon(d.kind, 34 * k)}<span style="opacity:.8">${tempStr(d.max)} ${tempStr(d.min)}</span></div>`).join("")}</div>` : "";
-  return `<div class="${anim}" style="${card}padding:${16 * k}px ${22 * k}px;color:${txt};min-width:${330 * k}px"><div style="display:flex;align-items:center;gap:${18 * k}px">${wxIcon(w.kind, 100 * k)}<div><div style="display:flex;align-items:baseline;gap:${12 * k}px"><span style="font-size:${52 * k}px;font-weight:300;line-height:1">${tempStr(w.temp)}</span><span><b style="font-size:${15 * k}px;display:block">${esc(w.text)}</b><span style="font-size:${13 * k}px;opacity:.65">${hl}</span></span></div><div style="font-size:${13 * k}px;font-weight:700;letter-spacing:.06em;margin-top:${8 * k}px;opacity:.85">${place}</div>${det}</div></div>${days}</div>`;
+  return `<div class="${anim}" style="${card}padding:${16 * k}px ${22 * k}px;color:${txt};min-width:${330 * k}px"><div style="display:flex;align-items:center;gap:${18 * k}px">${wxIcon(w.kind, 100 * k)}<div><div style="display:flex;align-items:baseline;gap:${12 * k}px"><span style="font-size:${52 * k}px;font-weight:300;line-height:1">${tempStr(w.temp)}</span><span><b style="font-size:${15 * k}px;display:block">${esc(tWeather(w.text))}</b><span style="font-size:${13 * k}px;opacity:.65">${hl}</span></span></div><div style="font-size:${13 * k}px;font-weight:700;letter-spacing:.06em;margin-top:${8 * k}px;opacity:.85">${placeU}</div>${det}</div></div>${days}</div>`;
 }
 function pageWeather() {
   const tiles = h("div", { class: "tiles", "data-key": "WeatherStyle" });
@@ -1150,7 +1293,7 @@ function pageWeather() {
     action("weatherPlace", { label: p.label, lat: p.lat, lon: p.lon }).then(() => {
       C.WeatherCity = p.label; search.value = ""; results.style.display = "none";
       current.querySelector(".l b").textContent = p.label; current.querySelector(".l small").textContent = "Weather comes from Open-Meteo and refreshes every 15 minutes";
-      toast("Weather for " + p.label); updateSide(); setTimeout(pollWeather, 1200); setTimeout(pollWeather, 4000);
+      toast(Tx("Weather for {x}", p.label)); updateSide(); setTimeout(pollWeather, 1200); setTimeout(pollWeather, 4000);
     });
   }
   const stage = h("div", { class: "stage", "data-weather": "cur", "data-big": "1", style: "height:auto;min-height:190px;padding:18px" }); stage.innerHTML = weatherHTML(C.WeatherStyle, true);
@@ -1237,11 +1380,7 @@ function glowLoop(ts) {
     const dt = Math.min(.1, (ts - glowLast) / 1000 || .016); glowLast = ts;
     fakeLevels(dt); stepEmbers(dt);
     cvs.forEach(cv => { const r = cv.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) return; if (r.width && (cv.width !== Math.round(r.width) || cv.height !== Math.round(r.height))) { cv.width = Math.round(r.width); cv.height = Math.round(r.height); } const gs = cv.dataset.glow;
-      if (gs.startsWith("fs") || gs === "skin") { // the full-screen frame: same drawing, its own settings
-        const keep = [C.GlowStyle, C.GlowBright, C.GlowReach, C.GlowColorMode, C.GlowWhere, C.HaloPalette], st = gs === "fs" ? C.FsFrameStyle : gs === "skin" ? C.SkinFrameStyle : +gs.slice(3);
-        C.GlowStyle = st; C.GlowBright = C.FsFrameBright; C.GlowReach = C.FsFrameReach * .6; C.GlowColorMode = C.FsFrameColor; C.GlowWhere = 0; C.HaloPalette = C.FsPalette;
-        try { drawGlow(cv, st); } finally { [C.GlowStyle, C.GlowBright, C.GlowReach, C.GlowColorMode, C.GlowWhere, C.HaloPalette] = keep; }
-      } else drawGlow(cv, gs === "cur" ? C.GlowStyle : +gs); });
+      drawGlow(cv, gs === "cur" ? C.GlowStyle : +gs); });
   }
   requestAnimationFrame(glowLoop);
 setInterval(() => {
@@ -1287,96 +1426,32 @@ function pageGlow() {
 }
 
 /* ---------- Full screen ---------- */
-const FS_STYLES = ["Glass", "Bouncing", "Scatter", "Constellation", "Karaoke", "Cinematic", "Focus", "Echo", "Kinetic", "Spotlight", "Wave", "Ink", "Rain", "Split", "Neon", "Typewriter"];
-const FS_MODE_BLURB = ["The visualizer, big, around the cover", "A sharp, glowing cover that breathes with the bass", "A big record turning in the middle", "Nothing in the way — just the words"];
-const FS_BG_BLURB = ["The cover, blurred into a slow drifting wash", "A disc of light circling a dark shadow", "Slow curtains of northern lights", "Clouds of colour drifting in space", "Gradients turning through the colours", "Flying through stars, faster on the kick", "Dark, with a soft light behind", "The song's music video from YouTube — muted, in time with the song"];
-function fsPair() {
-  const p = C.FsPalette, n = S.palettes.length;
-  if (p === 0) { const a = fsThemeHex()[1]; return [a, mix(a, "#ffffff", .45)]; } // the full-screen lyrics colours
-  if (p === 1) return [albumHex, fsHue(mix(albumHex, "#ffffff", .15), 32)];
-  if (p === n - 1) return [C.HaloColorA, C.HaloColorB];
-  return [S.palettes[p].a, S.palettes[p].b];
+function cinemaHTML(H) {
+  // sizes follow the height (like the real screen), places across follow the width
+  const u = H / 1080, A = 0.43 * H, top = Math.max(70 * u, (H - (A + 338 * u)) / 2 - 14 * u);
+  const col = albumHex || "#7a6a40", cov = coverURL();
+  const art = cov ? `background:url('${cov}') center/cover` : `background:linear-gradient(135deg,${col},#222)`;
+  const bgs = [`radial-gradient(60% 70% at 70% 30%,${mix(col, "#000000", .35)}cc,transparent),radial-gradient(50% 60% at 20% 80%,${mix(col, "#000000", .55)}aa,transparent),linear-gradient(90deg,#000a,#0000 70%),#0b0b0f`,
+    cov ? `linear-gradient(90deg,#000c,#0008),url('${cov}') center/cover` : "#1a1a1a", `linear-gradient(135deg,${mix(col, "#000000", .45)},${mix(col, "#000000", .78)})`,
+    `radial-gradient(70% 90% at 85% 10%,${mix(col, "#000000", .7)},transparent),#07070a`, `radial-gradient(40% 50% at 30% 40%,${mix(col, "#000000", .35)},transparent),radial-gradient(40% 50% at 70% 60%,${mix(col, "#7a5cff", .5)}99,transparent),#0b0b10`];
+  const bg = bgs[C.FsBg] || bgs[0], mode = C.FsCover | 0;
+  const ln = (t, a, b) => `<div style="opacity:${a};font-weight:${C.FsBold ? 800 : 500};font-size:${46 * u}px;line-height:1.2;margin-bottom:${32 * u}px;white-space:nowrap">${b ? `<span>${t[0]}</span><span style="opacity:.42">${t[1]}</span>` : t}</div>`;
+  const ly = C.FsLyrics ? `<div style="position:absolute;left:50%;top:${0.22 * H}px;right:7%;overflow:hidden;color:#fff;font-family:'${C.FsFont}',Segoe UI,sans-serif">${ln("I'm going back to 505", .26)}${ln(["If it's a seven-hour ", "flight"], 1, true)}${ln("Or a 45-minute drive", .34)}${ln("If I'm on your mind", .2)}</div>` : "";
+  const left = C.FsLyrics ? "4.5%" : `calc(50% - ${A / 2}px)`;
+  return `<div style="position:absolute;inset:0;overflow:hidden;background:${bg};font-family:Segoe UI,sans-serif">
+    ${mode === 2 ? `<div style="position:absolute;left:${left};top:${top}px;width:${A}px;height:${A}px;border-radius:50%;background:repeating-radial-gradient(circle,#0c0c0e 0 2px,#151518 2px 3px);box-shadow:0 ${A * .05}px ${A * .12}px #000c;animation:spin 3.4s linear infinite"><div style="position:absolute;inset:32%;border-radius:50%;${art}"></div><div style="position:absolute;inset:48.5%;border-radius:50%;background:#000"></div></div>${C.FsArm ? (() => { const ac = ["", "#d3d6dc", "#2c2d32", "#c9a35a"][C.FsArm]; return `<div style="position:absolute;left:calc(${left} + ${A * 0.93}px);top:${top + A * 0.07}px;width:${A * 0.1}px;height:${A * 0.1}px;border-radius:50%;background:${ac};box-shadow:0 0 0 ${A * 0.025}px #1b1b1f"></div><div style="position:absolute;left:calc(${left} + ${A * 0.975}px);top:${top + A * 0.12}px;width:${Math.max(2, A * 0.022)}px;height:${A * 0.62}px;background:${ac};transform-origin:top;transform:rotate(${C.FsArm && S.now && S.now.playing === false ? 4 : 17}deg);border-radius:2px"></div>`; })() : ""}`
+      : `<div style="position:absolute;left:${left};top:${mode ? top - 40 * u : top}px;width:${mode ? A * 1.1 : A}px;height:${mode ? A * 1.1 : A}px;border-radius:${A * .028}px;${art};box-shadow:0 ${A * .05}px ${A * .12}px #000c"></div>`}
+    <div style="position:absolute;left:${left};top:${top + A + 44 * u}px;width:${A}px;color:#fff;${C.FsLyrics ? "" : "text-align:center"};white-space:nowrap;overflow:hidden"><div style="font-weight:600;font-size:${42 * u}px">${esc(S.now.title || "Song title")}</div><div style="opacity:.72;font-size:${29 * u}px">${esc(S.now.artist || "Artist")}</div></div>
+    <div style="position:absolute;left:${left};top:${top + A + 198 * u}px;width:${A}px;height:${Math.max(1, 5 * u)}px;border-radius:9px;background:#fff3"><i style="display:block;width:38%;height:100%;border-radius:9px;background:#fff"></i></div>
+    <div style="position:absolute;left:${left};margin-left:${A / 2 - 38 * u}px;top:${top + A + 262 * u}px;width:${76 * u}px;height:${76 * u}px;border-radius:50%;background:#fff"></div>
+    ${ly}
+    ${C.FsClock ? `<div style="position:absolute;right:${54 * u}px;top:${34 * u}px;color:#fff;font-weight:600;font-size:${30 * u}px;opacity:.9">20:47</div>` : ""}</div>`;
 }
-function fsThemeHex() {
-  const t = S.themes[C.FsTheme] || {}, custom = C.FsTheme === S.themes.length - 1;
-  return [custom ? C.FsTextColor : (t.text || "#FFFFFF"), custom ? C.FsAccentColor : (t.accent || albumHex)];
-}
-function fsHue(hex, deg) { // rough hue turn for previews
-  const n = parseInt(hex.slice(1), 16); let r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; let hh = 0, s = 0;
-  if (mx !== mn) { const d = mx - mn; s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn); hh = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; hh /= 6; }
-  hh = ((hh + deg / 360) % 1 + 1) % 1;
-  const f = (p, q, t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < .5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
-  const q = l < .5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
-  return "#" + [f(p, q, hh + 1 / 3), f(p, q, hh), f(p, q, hh - 1 / 3)].map(v => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
-}
-function fsBgHTML(i, cy) {
-  cy = cy || 50;
-  const [a, b] = fsPair(), cov = coverURL(), hot = mix(b, "#ffffff", .55);
-  if (i === 0 && !cov) i = 3;
-  let l = "";
-  switch (i) {
-    case 0: l = `<div class="fsl fsken" style="background:url('${cov}') center/cover;filter:blur(14px) brightness(.5) saturate(1.3)"></div>`; break;
-    case 1: l = `<div class="fsl" style="background:#020205"></div><div class="fsl" style="background:radial-gradient(circle at 50% ${cy}%,${a}55,transparent 45%)"></div>
-      <div class="bh" style="top:${cy}%"><div class="bhd" style="background:conic-gradient(from 0deg,transparent,${a} 12%,${hot} 22%,transparent 34%,${b} 50%,${hot} 60%,transparent 74%,${a} 88%,transparent)"></div></div>
-      <div class="bhc" style="top:${cy}%;box-shadow:0 0 0 2px ${hot}cc,0 0 14px 3px ${a}88"></div>`; break;
-    case 2: l = `<div class="fsl" style="background:linear-gradient(#02040c,#0a1226)"></div><div class="fsl fsaur" style="background:linear-gradient(100deg,transparent 8%,${a}aa 22%,transparent 36%,${b}99 52%,transparent 66%,${fsHue(a, 60)}88 82%,transparent)"></div>`; break;
-    case 3: l = `<div class="fsl fsdrift" style="background:radial-gradient(circle at 28% 38%,${a}70,transparent 42%),radial-gradient(circle at 72% 62%,${b}66,transparent 46%),radial-gradient(circle at 58% 22%,${fsHue(a, 70)}55,transparent 36%),radial-gradient(circle at 36% 78%,${fsHue(a, -50)}50,transparent 38%),#04040a"></div>`; break;
-    case 4: l = `<div class="fsl fsflow" style="background:linear-gradient(120deg,${mix(a, "#000000", .45)},${mix(b, "#000000", .55)},${mix(fsHue(a, 140), "#000000", .5)},${mix(a, "#000000", .45)});background-size:300% 300%"></div>`; break;
-    case 5: { let st = ""; for (let k = 0; k < 26; k++) { const x = (k * 37 % 100), y = (k * 61 % 100); st += `radial-gradient(1.2px 1.2px at ${x}% ${y}%,#fff${k % 3 ? "a" : "f"},transparent),`; }
-      l = `<div class="fsl" style="background:radial-gradient(circle at 50% 50%,${a}33,transparent 50%),linear-gradient(#020208,#070816)"></div><div class="fsl fswarp" style="background:${st.slice(0, -1)}"></div>`; break; }
-    case 7: l = `<div class="fsl fsken" style="background:${cov ? `url('${cov}') center/cover` : `linear-gradient(135deg,${a},${b})`};filter:brightness(.6) saturate(1.2)"></div><div class="fsl fsvid"><b>▶</b><span>MUSIC VIDEO</span></div>`; break;
-    default: l = `<div class="fsl" style="background:radial-gradient(circle at 50% 50%,${a}40,${mix(a, "#000000", .92)} 60%)"></div>`;
-  }
-  return l + `<div class="fsl" style="background:radial-gradient(ellipse at center,transparent 50%,#000b 100%)"></div>`;
-}
-function fsLyricCSS(fx, txt, acc) {
-  switch (fx) {
-    case 1: return `text-shadow:0 0 .35em ${acc}aa`;
-    case 2: return `text-shadow:0 0 .15em ${acc},0 0 .6em ${acc}`;
-    case 3: return `text-shadow:.06em .08em .12em #000`;
-    case 4: return `-webkit-text-stroke:.03em ${acc}`;
-    case 5: return `color:#fff;text-shadow:0 0 .08em #fff,0 0 .3em ${acc},0 0 .7em ${acc}`;
-    case 6: return `background:linear-gradient(90deg,${txt},${acc});-webkit-background-clip:text;background-clip:text;color:transparent`;
-    case 7: return `text-shadow:.05em 0 #ff2a6dcc,-.05em 0 #05d9e8cc`;
-    case 8: return `text-shadow:${[1, 2, 3, 4, 5, 6].map(k => `${k * .025}em ${k * .025}em 0 ${mix(acc, "#000000", .5)}`).join(",")}`;
-    case 9: return `color:transparent;-webkit-text-stroke:.03em ${txt}`;
-    case 10: return `filter:blur(.4px);text-shadow:0 0 .2em ${txt}88`;
-    case 11: return `color:${txt}dd;text-shadow:0 .04em .1em #0008,0 0 .4em #fff4`;
-  }
-  return "";
-}
-// the preview: a little monitor with everything the full screen shows
-function fsHTML(H) {
-  const k = H / 1080, mode = C.FsMode, [a, b] = fsPair(), [txt, acc] = fsThemeHex();
-  let cy = 50;
-  if (mode !== 3) { if ((C.FsLyrics && C.FsLyricsPos === 0) || C.FsInfo === 2) cy = 43; else if (C.FsLyrics && C.FsLyricsPos === 1) cy = 56; }
-  const side = H, R = mode === 0 ? side * .3 : mode === 1 ? side * .23 : mode === 2 ? side * .33 : 0;
-  let centre = "";
-  if (mode === 1) centre = `<div class="fsc fsart" style="top:${cy}%;width:${2 * R}px;height:${2 * R}px;${coverBG()};box-shadow:0 0 ${R * .5}px ${a}88,0 ${R * .08}px ${R * .3}px #000c"></div>`;
-  if (mode === 2) centre = `<div class="fsc" style="top:${cy}%">${discHTML(C.DiscStyle, Math.round(2 * R), true)}</div>`;
-  if (mode === 0) { const keep = C.HaloPalette; C.HaloPalette = C.FsPalette; centre = `<div class="fsc" style="top:${cy}%;width:260px;height:260px;transform:scale(${(2 * R) / 260})">${visHTML(C.FsVis ? C.FsVis - 1 : C.HaloStyle, true)}</div>`; C.HaloPalette = keep; }
-  const rip = C.FsRipple && mode !== 3 ? `<div class="fsrip" style="top:${cy}%;width:${2 * R + 4}px;height:${2 * R + 4}px;border-color:${a}"></div>` : "";
-  // lyrics
-  let lyr = "";
-  if (C.FsLyrics) {
-    const fsz = Math.max(7, C.FsTextSize * k), pos = mode === 3 && C.FsLyricsPos !== 3 ? -1 : C.FsLyricsPos;
-    const top = pos === 0 ? `top:calc(${cy}% + ${R + (C.FsInfo === 2 ? 120 * k : 30 * k) + fsz * .7}px)` : pos === 1 ? `top:calc(${cy}% - ${R + fsz * .9}px)` : pos === 2 ? "top:12%" : pos === 3 ? "top:22%;left:24%" : "top:50%";
-    const style = S.styles[C.FsLyricsStyle];
-    const words = ["City", "lights", "fading"].map((w, i) => `<span style="${i === 1 ? "color:" + acc : ""}${style === "Bouncing" && i === 1 ? ";display:inline-block;animation:spring .9s ease-in-out infinite" : ""}">${esc(caseText(w))}</span>`).join(" ");
-    lyr = `<div class="fslyr" style="${top};max-width:${C.FsLyricsWidth}%;font:${C.FsBold ? 700 : 400} ${fsz}px '${esc(C.FsFont)}',Segoe UI,sans-serif;color:${txt};${fsLyricCSS(C.FsEffect, txt, acc)}">${words}${style === "Constellation" ? `<svg class="fsstar" viewBox="0 0 100 20"><polyline points="8,14 40,4 74,12 94,6" fill="none" stroke="${acc}" stroke-opacity=".6" stroke-width=".6"/>${[[8, 14], [40, 4], [74, 12], [94, 6]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.4" fill="${acc}"/>`).join("")}</svg>` : ""}</div>`;
-  }
-  let info = "";
-  if (C.FsInfo === 1) info = `<div class="fsinfo" style="left:${56 * k}px;bottom:${56 * k}px;font-size:${Math.max(6, 22 * k)}px"><i style="width:${96 * k}px;height:${96 * k}px;${coverBG()}"></i><div><b>${esc(S.now.title || "Song title")}</b><br><span>${esc(S.now.artist || "Artist")}</span><em style="background:linear-gradient(90deg,${a} 40%,#fff4 40%)"></em></div></div>`;
-  if (C.FsInfo === 2) info = `<div class="fsinfo2" style="top:calc(${mode === 3 ? 78 : cy}% + ${mode === 3 ? 0 : R + 30 * k}px);font-size:${Math.max(6, 24 * k)}px"><b>${esc(S.now.title || "Song title")}</b><br><span>${esc(S.now.artist || "Artist")}</span><em style="background:linear-gradient(90deg,${a} 40%,#fff4 40%)"></em></div>`;
-  const clock = C.FsClock ? `<div class="fsclock" style="right:${64 * k}px;top:${48 * k}px;font-size:${Math.max(10, 84 * k)}px">${DF.time ? DF.time.format(new Date()).replace(/\s?[AP]M/i, "") : "21:47"}</div>` : "";
-  const frame = C.FsFrame ? `<canvas class="fsframe" data-glow="fs"></canvas>` : "";
-  return fsBgHTML(C.FsBg, cy) + rip + centre + info + lyr + clock + frame;
-}
-function fsSig() { return JSON.stringify([C.FsKind, C.SkinFlowCount, C.SkinBg, C.SkinDim, C.SkinClock, C.SkinDate, C.SkinClockFont, C.SkinClockColor, C.Clock24h, C.SkinList, C.SkinCentre, C.SkinBar, C.SkinService, C.SkinGlass, C.SkinLyrics, C.SkinFrame, new Date().getMinutes(), C.FsMode, C.FsBg, C.FsVis, C.FsPalette, C.FsRipple, C.FsInfo, C.FsClock, C.FsLyrics, C.FsLyricsStyle, C.FsFont, C.FsTextSize, C.FsBold, C.FsEffect, C.FsTheme, C.FsTextColor, C.FsAccentColor, C.FsLyricsPos, C.FsLyricsWidth, C.FsFrame, C.HaloStyle, C.DiscStyle, C.SpinRPM, C.TextCase, albumHex, coverURL()]); }
+function fsPreview(H) { return cinemaHTML(H); }
+function fsSig() { return JSON.stringify([C.FsLyrics, C.FsStage, C.FsClock, C.FsFont, C.FsBold, C.FsBg, C.FsCover, C.FsDisc, C.FsArm, albumHex, coverURL(), S.now && S.now.title]); }
 function refreshFs(force) {
   const sig = fsSig();
-  document.querySelectorAll("[data-fsstage]").forEach(e => { if (!force && e._sig === sig) return; e._sig = sig; const H = e.getBoundingClientRect().height || 300; e.innerHTML = C.FsKind === 1 ? skinHTML(H) : fsHTML(H); });
+  document.querySelectorAll("[data-fsstage]").forEach(e => { if (!force && e._sig === sig) return; e._sig = sig; const H = e.getBoundingClientRect().height || 300; e.innerHTML = fsPreview(H); });
 }
 function valueChips(attr, key, list, after) {
   const wrap = h("div", { class: "chips", [attr]: key });
@@ -1387,31 +1462,12 @@ function valueChips(attr, key, list, after) {
 function pageFull() {
   const stage = h("div", { class: "fsstage", "data-fsstage": "1" });
   setTimeout(() => refreshFs(true), 0);
-  const mini = (fn, i) => { const pv = h("div", { class: "pv fsmini" }); pv.innerHTML = fn(i); return pv; };
-  const tileSet = (key, names, blurbs, pv, after) => {
-    const tiles = h("div", { class: "tiles big", "data-key": key });
-    names.forEach((n, i) => tiles.append(h("div", { class: "tile" + (C[key] === i ? " on" : ""), "data-i": i, on: { click: () => {
-      set(key, i, true); [...tiles.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); if (after) after(i); } } }, pv(i), h("div", { class: "nm" }, n), h("small", {}, blurbs[i]))));
-    return tiles;
-  };
-  const modePV = i => { const keep = C.FsMode, kl = C.FsLyrics, ki = C.FsInfo, kc = C.FsClock, kf = C.FsFrame, kr = C.FsRipple; C.FsMode = i; C.FsLyrics = i === 3; C.FsInfo = 0; C.FsClock = false; C.FsFrame = false; C.FsRipple = false;
-    const pv = h("div", { class: "pv fsmini" }); pv.innerHTML = fsHTML(84); C.FsMode = keep; C.FsLyrics = kl; C.FsInfo = ki; C.FsClock = kc; C.FsFrame = kf; C.FsRipple = kr; return pv; };
-  const visBox = h("div", { id: "fsVisBox", style: C.FsMode === 0 ? "" : "display:none" },
-    ...sec("Visualizer", "The style in the middle, and its colours."),
-    chips("FsVis", ["Same as the widget", ...S.vis]), h("div", { style: "height:6px" }),
-    chips("FsPalette", S.palettes.map(p => p.name)));
-  const vinylBox = h("div", { id: "fsVinylBox", style: C.FsMode === 2 ? "" : "display:none" },
-    h("p", { class: "hint", style: "margin-top:10px" }, "The record uses your Vinyl look — style, colours, speed, groove light and the tonearm."),
-    h("button", { class: "btn", "data-goto": "vinyl", on: { click: () => go("vinyl") } }, "Vinyl settings ›"));
-  const showMode = i => { visBox.style.display = i === 0 ? "" : "none"; vinylBox.style.display = i === 2 ? "" : "none"; };
-  // lyrics style: the ones that shine big, plus every other style
-  const stIdx = n => S.styles.indexOf(n);
-  const stTiles = h("div", { class: "grid", "data-fsstyles": "1" });
-  const markSt = () => { [...stTiles.children].forEach(c => c.classList.toggle("on", +c.dataset.i === C.FsLyricsStyle)); if (sel) sel.value = C.FsLyricsStyle; };
-  FS_STYLES.filter(n => stIdx(n) >= 0).forEach(n => { const i = stIdx(n), pv = h("div", { class: "pv" }); pv.innerHTML = PV[n] || n;
-    stTiles.append(h("div", { class: "card" + (C.FsLyricsStyle === i ? " on" : ""), "data-i": i, title: n, on: { click: () => { set("FsLyricsStyle", i, true); markSt(); } } }, pv, h("div", { class: "nm" }, n))); });
-  const sel = h("select", { "data-fsstylesel": "1", on: { change: e => { set("FsLyricsStyle", +e.target.value, true); markSt(); } } }, ...S.styles.map((n, i) => h("option", { value: i }, n)));
-  sel.value = C.FsLyricsStyle;
+  // the lyrics stage: Lines, or any of the lyric styles — big, on the right half of the screen
+  const stTiles = h("div", { class: "grid", "data-key": "FsStage" });
+  const markSt = () => [...stTiles.children].forEach(c => c.classList.toggle("on", +c.dataset.i === C.FsStage));
+  S.lists.stages.forEach((n, i) => { const pv = h("div", { class: "pv" });
+    pv.innerHTML = i === 0 ? `<div style="text-align:left;line-height:1.35"><div style="opacity:.3">I'm going back</div><div><b>to five</b><span style="opacity:.45"> oh five</span></div><div style="opacity:.3">if it's a seven</div></div>` : (PV[n] || n);
+    stTiles.append(h("div", { class: "card" + (C.FsStage === i ? " on" : ""), "data-i": i, title: tStyle(n), on: { click: () => { set("FsStage", i, true); markSt(); refreshFs(true); } } }, pv, h("div", { class: "nm" }, tStyle(n)))); });
   // font: the five families, or any installed font
   const fsel = h("select", { "data-fsfontsel": "1", on: { change: e => { set("FsFont", e.target.value, true); markFont(); } } }, ...S.fonts.slice(0, 600).map(f => h("option", { value: f }, f)));
   if (!S.fonts.includes(C.FsFont)) fsel.prepend(h("option", { value: C.FsFont }, C.FsFont));
@@ -1427,139 +1483,53 @@ function pageFull() {
     const sw = t.name === "Album colours" ? "conic-gradient(#e33,#e8b04a,#3c8,#38f,#e33)" : t.name === "Custom" ? "linear-gradient(90deg," + C.FsTextColor + "," + C.FsAccentColor + ")" : `linear-gradient(90deg,${t.text},${t.accent})`;
     themes.append(h("button", { class: "swatch" + (C.FsTheme === i ? " on" : ""), "data-i": i, on: { click: () => { set("FsTheme", i, true); [...themes.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); custom.style.display = i === S.themes.length - 1 ? "" : "none"; } } }, h("i", { style: "background:" + sw }), t.name));
   });
-  // frame styles drawn live with the full-screen frame settings
-  const ftiles = h("div", { class: "tiles big", "data-key": "FsFrameStyle" });
-  S.lists.glowStyles.forEach((n, i) => { const pv = h("div", { class: "pv", style: "height:84px;padding:0" }); pv.innerHTML = `<div class="gscreen"><canvas data-glow="fs:${i}"></canvas></div>`;
-    ftiles.append(h("div", { class: "tile" + (C.FsFrameStyle === i ? " on" : ""), "data-i": i, on: { click: () => { set("FsFrameStyle", i, true); [...ftiles.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); } } }, pv, h("div", { class: "nm" }, n))); });
-  const keys = [["Esc · F11 · double-click", "Leave full screen"], ["A", "Next mode"], ["B", "Next background"], ["V", "Next visualizer"], ["← →", "Lyrics style"], ["↑ ↓ · mouse wheel", "Lyrics size"], ["L · P", "Lyrics on/off · where"], ["E · T", "Text effect · colours"], ["F · G", "Frame on/off · frame style"], ["C · I · R", "Clock · song info · ripple"], ["Space", "Play / pause"], ["S", "Back to these settings"], ["Right-click", "The Orbit menu"], [", .", "Music video earlier / later"], ["N", "Another music video"], ["Q", "How fast this PC draws it"]];
-  // the desktop skin
-  const skStyles = h("div", { class: "grid", "data-skstyles": "1" });
-  ["Kinetic", "Pop", "Bouncing", "Scatter", "Cinematic", "Glass", "Focus", "Constellation", "Neon", "Ink", "Echo", "Spotlight"].filter(n => stIdx(n) >= 0).forEach(n => { const i = stIdx(n), pv = h("div", { class: "pv" }); pv.innerHTML = PV[n] || n;
-    skStyles.append(h("div", { class: "card" + (C.SkinLyricsStyle === i ? " on" : ""), "data-i": i, title: n, on: { click: () => { set("SkinLyricsStyle", i, true); [...skStyles.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); } } }, pv, h("div", { class: "nm" }, n))); });
-  const skFrames = h("div", { class: "tiles big", "data-key": "SkinFrameStyle" });
-  S.lists.glowStyles.forEach((n, i) => { const pv = h("div", { class: "pv", style: "height:84px;padding:0" }); pv.innerHTML = `<div class="gscreen"><canvas data-glow="fs:${i}"></canvas></div>`;
-    skFrames.append(h("div", { class: "tile" + (C.SkinFrameStyle === i ? " on" : ""), "data-i": i, on: { click: () => { set("SkinFrameStyle", i, true); [...skFrames.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); } } }, pv, h("div", { class: "nm" }, n))); });
-  const SK_BG_BLURB = ["The cover, sharp, across the whole screen", "The cover, blurred into a slow wash", ...FS_BG_BLURB.slice(1)];
-  const skBgPV = i => { const pv = h("div", { class: "pv fsmini" }); pv.innerHTML = skinBgHTML(i); return pv; };
-  const clockCol = h("div", { class: "swatches", "data-key": "SkinClockColor" });
-  S.lists.skinClockColors.forEach((n, i) => { const [t, b] = skinClockGrad(i);
-    clockCol.append(h("button", { class: "swatch" + (C.SkinClockColor === i ? " on" : ""), "data-i": i, on: { click: () => { set("SkinClockColor", i, true); [...clockCol.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); } } }, h("i", { style: `background:linear-gradient(${t},${b})` }), n)); });
-  const skinKeys = [["Esc · F11 · double-click", "Leave"], ["Space", "Play / pause"], ["← →", "Previous / next song"], ["/ · K", "Search songs — suggestions as you type"], ["↑ ↓ · Enter", "Pick a suggestion · play it"], ["Click the cover", "Play / pause"], ["Enter · Esc", "Search · stop typing"], ["B", "Next background"], ["M", "Cover card / cover flow / nothing"], ["C · T", "Clock · clock colour"], ["P", "Up next list"], ["L", "Lyrics"], ["F · G", "Edge light · its style"], ["D", "Switch to the music display"], ["S", "Back to these settings"], [", .", "Music video earlier / later"], ["N", "Another music video"], ["Click a song or a card", "Go to that song"], ["Click / drag the time line", "Jump in the song"], ["Shuffle · repeat", "The buttons beside ⏮ ⏭"], ["Wheel over the bar", "Volume"], ["Q", "How fast this PC draws it"]];
-  const displayBox = h("div", { id: "fsDisplay", style: C.FsKind === 0 ? "" : "display:none" },
-    ...sec("Mode", "What sits in the middle of the screen."), tileSet("FsMode", S.lists.fsModes, FS_MODE_BLURB, modePV, showMode),
-    visBox, vinylBox,
-    ...sec("Background", "Everything moves slowly, and a little more on the bass."), tileSet("FsBg", S.lists.fsBgs, FS_BG_BLURB, i => mini(fsBgHTML, i)),
-    ...sec("On screen"),
-    chips("FsInfo", S.lists.fsInfos.map(n => n === "Off" ? "No song info" : "Song info · " + n.toLowerCase())), h("div", { style: "height:6px" }),
-    toggle("FsClock", "Clock", "Big and quiet in the top-right corner"),
-    ...sec("Lyrics", "Full screen has its own lyrics look — the desktop lyrics stay as they are."),
-    toggle("FsLyrics", "Show lyrics"),
-    h("div", { style: "height:8px" }), stTiles,
-    h("div", { class: "row" }, label("Every style", "Any of the " + S.styles.length + " lyrics styles"), sel),
-    ...sec("Where the lyrics go"), chips("FsLyricsPos", S.lists.fsLyrPos),
-    ...sec("Around the screen", "A frame of light running around the edges."),
-    toggle("FsFrame", "Frame of light"),
-    h("div", { style: "height:8px" }), ftiles,
-    ...sec("Keys"), h("div", { class: "summary" }, ...keys.map(([k, v]) => h("div", {}, h("span", {}, v), h("b", {}, k)))));
-  const skinBox = h("div", { id: "fsSkinBox", style: C.FsKind === 1 ? "" : "display:none" },
-    ...sec("Background"), tileSet("SkinBg", S.lists.skinBgs, SK_BG_BLURB, skBgPV),
-    h("div", { style: "height:8px" }), slider("SkinDim", "Darken", 0, 0.85, 0.05, pct, "Keeps the clock and the panels easy to read on bright covers"),
-    ...sec("Clock", "Tall and bright in the top-right corner, the date above it."),
-    toggle("SkinClock", "Clock"), toggle("SkinDate", "Date above it"), toggle("Clock24h", "24-hour time", "Shared with the Clock widget"),
-    chips("SkinClockFont", S.lists.skinClockFonts), h("div", { style: "height:8px" }), clockCol,
-    ...sec("Middle"), chips("SkinCentre", S.lists.skinCentres),
-    h("div", { class: "row" }, label("Covers on each side", "Cover flow: songs before and after the playing one")),
-    valueChips("data-flowcount", "SkinFlowCount", [[1, "1"], [2, "2"], [3, "3"]]),
-    ...sec("Panels", "Frosted glass over the background."),
-    toggle("SkinList", "Up next list", "The songs that play next, on the left (the ones you played when Orbit doesn't know what's next)"),
-    toggle("SkinBar", "Player bar", "Previous, play/pause, next, the song and a search box at the bottom"),
-    h("div", { class: "row" }, label("Search and open songs with", "Automatic follows the app that is playing")),
-    chips("SkinService", S.lists.services),
-    h("div", { style: "height:8px" }), slider("SkinGlass", "Glass", 0.2, 1, 0.05, pct, "How solid the panels are"),
-    ...sec("Spotify queue", "Windows only tells apps what plays now. Connect your Spotify account once and the list and the covers show what really plays next."),
-    spotifyBox(),
-    ...sec("Lyrics", "Big words drifting across the open part of the screen. Font, size, effect and colours below."),
-    toggle("SkinLyrics", "Show lyrics"), h("div", { style: "height:8px" }), skStyles,
-    ...sec("Edge light"), toggle("SkinFrame", "Light around the screen"), h("div", { style: "height:8px" }), skFrames,
-    ...sec("Keys"), h("div", { class: "summary" }, ...skinKeys.map(([k, v]) => h("div", {}, h("span", {}, v), h("b", {}, k)))));
-  const sub = h("h2", { class: "fssub", id: "fsSub" }, S.lists.fsKinds[C.FsKind]);
-  const kindTiles = tileSet("FsKind", S.lists.fsKinds, ["A big cover, record or visualizer over a moving background", "A clock, what plays next, a player bar with search — like a music desktop"],
-    i => { const pv = h("div", { class: "pv fsmini" }); const keep = C.FsKind; C.FsKind = i; pv.innerHTML = i ? skinHTML(84) : fsHTML(84); C.FsKind = keep; return pv; },
-    i => { displayBox.style.display = i === 0 ? "" : "none"; skinBox.style.display = i === 1 ? "" : "none"; sub.textContent = S.lists.fsKinds[i]; refreshFs(true); });
-  kindTiles.classList.add("kinds");
-  return [h("h1", {}, "Full screen"),
-    h("p", { class: "lede" }, "Two ways to take over a screen: a music display, or a whole music desktop with a clock, what plays next and a player bar."),
-    kindTiles, sub,
+  const keys = [["Esc · F11 · double-click", "Leave"], ["Space", "Play / pause"], ["← →", "Lyrics effect"], ["Ctrl + ← →", "Previous / next song"], ["↑ ↓", "Lyrics bigger / smaller"], ["E · T", "Text effect · colours"], ["L", "Lyrics on / off"], ["B", "Background"], ["V", "Cover or record"], ["R", "The record's look"], ["A", "Tonearm colour"], ["C", "Clock"], ["H", "All keys"], ["S", "Back to these settings"], ["Wheel", "Volume"], ["Click / drag the time line", "Jump in the song"], ["Click Up next", "Skip to it"]];
+  return [h("h1", {}, "Cinema"),
+    h("p", { class: "lede" }, "Full screen: the cover, sharp and large, with the song and its controls on the left — and the lyrics on a big stage over the whole right half, in the effect you pick."),
     stage,
     h("div", { class: "btnrow", style: "margin-top:12px" },
-      h("button", { class: "btn primary", "data-act": "fullscreen", on: { click: () => action("fullscreen", true).then(() => toast(S.lists.fsKinds[C.FsKind] + " — Esc to leave")) } }, "⛶  Go full screen"),
-      h("span", { class: "hint", style: "align-self:center" }, "Ctrl+Alt+F from anywhere · Esc to leave · D switches between the two")),
-    displayBox, skinBox,
-    ...sec("Lyrics look", "Used by both: font, size, effect and colours."),
+      h("button", { class: "btn primary", "data-act": "fullscreen", on: { click: () => action("fullscreen", true).then(() => toast("Cinema — Esc to leave")) } }, "⛶  Go full screen"),
+      h("span", { class: "hint", style: "align-self:center" }, "Ctrl+Alt+F from anywhere · Esc to leave · ← → change the lyrics effect")),
+    ...sec("Left side", "The cover, or a turning record — with the Vinyl widget's records, effects and record change, or one of its own."),
+    (() => { const t = h("div", { class: "tiles", "data-key": "FsCover" });
+      S.lists.fsCovers.forEach((n, i) => { if (i === 1) return; // ("Big cover" is gone)
+        const pv = h("div", { class: "pv", style: "height:84px;display:flex;align-items:center;justify-content:center;background:#111" });
+        const cov = coverURL(), art = cov ? `background:url('${cov}') center/cover` : "background:linear-gradient(135deg,#7a6a40,#222)";
+        pv.innerHTML = i === 2 ? `<div style="width:62px;height:62px;border-radius:50%;${art};box-shadow:0 0 0 6px #0b0b0d,0 6px 14px #000"><div style="width:8px;height:8px;margin:27px;border-radius:50%;background:#111"></div></div>` : `<div style="width:${i ? 70 : 50}px;height:${i ? 70 : 50}px;border-radius:4px;${art};box-shadow:0 6px 14px #000"></div>`;
+        t.append(h("div", { class: "tile" + (C.FsCover === i ? " on" : ""), "data-i": i, on: { click: () => { set("FsCover", i, true); [...t.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); refreshFs(true); } } }, pv, h("div", { class: "nm" }, n))); });
+      return t; })(),
+    h("div", { class: "row" }, label("Record", "For the Vinyl look — the same as the Vinyl widget, or its own")),
+    chips("FsDisc", ["Like the Vinyl widget", ...S.discs]),
+    h("div", { class: "row" }, label("Tonearm", "Swings out to its rest when the music stops and back when it starts")),
+    chips("FsArm", S.lists.fsArms),
+    ...sec("Background"),
+    (() => { const t = h("div", { class: "tiles", "data-key": "FsBg" }), col = albumHex || "#7a6a40", cov = coverURL();
+      const bgs = [`radial-gradient(60% 70% at 70% 30%,${mix(col, "#000000", .3)},transparent),radial-gradient(50% 60% at 20% 80%,${mix(col, "#000000", .55)},transparent),#0b0b0f`,
+        cov ? `linear-gradient(#0009,#0009),url('${cov}') center/cover` : "#222", `linear-gradient(135deg,${mix(col, "#000000", .45)},${mix(col, "#000000", .75)})`,
+        `radial-gradient(70% 90% at 85% 10%,${mix(col, "#000000", .7)},transparent),#07070a`, `radial-gradient(40% 50% at 30% 40%,${mix(col, "#000000", .35)},transparent),radial-gradient(40% 50% at 70% 60%,${mix(col, "#7a5cff", .5)}99,transparent),#0b0b10`];
+      const blurb = ["The cover blurred into soft light", "The cover itself, darkened", "Two of its colours, corner to corner", "Near black, a faint glow", "Its colours drifting slowly"];
+      S.lists.fsBgs.forEach((n, i) => { const pv = h("div", { class: "pv", style: `height:70px;background:${bgs[i]}` });
+        t.append(h("div", { class: "tile" + (C.FsBg === i ? " on" : ""), "data-i": i, on: { click: () => { set("FsBg", i, true); [...t.children].forEach(c => c.classList.toggle("on", +c.dataset.i === i)); refreshFs(true); } } }, pv, h("div", { class: "nm" }, n), h("small", {}, blurb[i]))); });
+      return t; })(),
+    ...sec("Lyrics stage", "Lines: Apple-style, line by line, the words filling up as they are sung. Every other effect fills the right half of the screen from top to bottom — Scatter spreads the words all over it."),
+    toggle("FsLyrics", "Lyrics", "Off: the cover in the middle, no lyrics. A song without lyrics keeps its place and says so"),
+    h("div", { style: "height:8px" }), stTiles,
+    ...sec("Lyrics look", "Font, size, effect and colours of the stage."),
     fgroups,
     h("div", { class: "row" }, label("Font", "Any font installed on this PC"), fsel),
-    slider("FsTextSize", "Text size", 20, 200, 1, v => v + " px", "At 1080p — scales with the screen. Mouse wheel or ↑ ↓ in the music display too."),
+    slider("FsTextSize", "Text size", 20, 200, 1, v => v + " px", "At 1080p — scales with the screen. ↑ ↓ in full screen too."),
     toggle("FsBold", "Bold"),
-    slider("FsLyricsWidth", "Maximum line width", 30, 95, 1, v => v + "% of the screen"),
-    ...sec("Text effect"), chips("FsEffect", S.effects),
-    ...sec("Colours"), themes, custom,
-    ...sec("Light and colour", "The edge light and the scene colours, for both."),
-    chips("FsFrameColor", S.lists.glowColors), h("div", { style: "height:6px" }),
-    slider("FsFrameBright", "Brightness", 0.1, 1, 0.05, pct),
-    slider("FsFrameReach", "Reach", 0.3, 2.5, 0.05, pct, "How far the light reaches into the screen"),
-    toggle("FsRipple", "Bass ripple", "A ring of light leaves the middle on every kick"),
+    ...sec("Text effect", "For every effect except Lines. Soft and strong glow are real light here — the words stay sharp."), chips("FsEffect", S.effects),
+    ...sec("Colours", "For every effect except Lines (always white on the cover's colours)."), themes, custom,
+    ...sec("On screen"),
+    toggle("FsClock", "Clock", "Small, top left"),
     toggle("FsHiRes", "High-resolution covers", "Fetches a sharp 2000 px cover online when the player's is small — only kept when it matches"),
+    ...sec("Up next", "Under the controls, from your Spotify queue. Windows only tells apps what plays now — connect your Spotify account once and Cinema shows what really plays next."),
+    spotifyBox(),
     ...sec("Screen and smoothness", "When nothing moves (paused, mouse still) it drops to a few frames a second by itself."),
     chips("FsScreen", S.lists.fsScreens), h("div", { style: "height:6px" }),
-    valueChips("data-fsfps", "FsFPS", [[30, "30 fps · lighter"], [60, "60 fps · smoothest"]])];
-}
-
-/* the desktop skin preview */
-function skinClockGrad(i) { const acc = albumHex; return [[mix(acc, "#ffffff", .7), acc], ["#ffffff", "#dcdce6"], ["#ffd36b", "#ff4d8d"], ["#effaff", "#5ab8ff"], ["#ff6bf2", "#7a5cff"]][i] || ["#fff", "#ddd"]; }
-function skinBgHTML(i, stage) {
-  const cov = coverURL();
-  if (i === 0 && cov) return `<div class="fsl" style="background:url('${cov}') center 35%/cover"></div><div class="fsl" style="background:#000;opacity:${C.SkinDim}"></div><div class="fsl" style="background:linear-gradient(90deg,#0009,transparent 40%),linear-gradient(transparent 60%,#000a),radial-gradient(ellipse at center,transparent 50%,#0009)"></div>`;
-  const html = fsBgHTML(i <= 1 ? 0 : i - 1);
-  return stage ? html.replace(/<div class="fsl fsvid">.*?<\/div>/, "") : html; // the big stage shows the video, not its label
-}
-function skinHTML(H) {
-  const k = H / 1080, [txt, acc] = fsThemeHex(), cov = coverURL(), albumC = albumHex;
-  const glassCSS = `background:rgba(20,20,28,${(.25 + .45 * C.SkinGlass).toFixed(2)});backdrop-filter:blur(${Math.max(2, 14 * k)}px);border:1px solid rgba(255,255,255,${(.1 + .12 * C.SkinGlass).toFixed(2)})`;
-  let out = skinBgHTML(C.SkinBg, true);
-  if (C.SkinClock) {
-    const fam = ["'Bahnschrift Light Condensed','Bahnschrift Condensed','Arial Narrow',sans-serif;font-stretch:condensed;font-weight:300", "'Segoe UI Light','Segoe UI',sans-serif;font-weight:200", "'Segoe UI Black','Segoe UI',sans-serif;font-weight:900", "Georgia,serif;font-weight:400"][C.SkinClockFont];
-    const [t, b] = skinClockGrad(C.SkinClockColor), now = new Date();
-    const hh = C.Clock24h ? String(now.getHours()).padStart(2, "0") : String(now.getHours() % 12 || 12), mm = String(now.getMinutes()).padStart(2, "0");
-    out += `<div class="skclock" style="right:${50 * k}px;top:${40 * k}px">${C.SkinDate ? `<div class="skdate" style="font-size:${Math.max(6, 22 * k)}px">${esc(DF.short.format(now))}</div>` : ""}<div style="font-family:${fam};font-size:${(C.SkinClockFont ? 230 : 300) * k}px;line-height:.95;background:linear-gradient(${t},${b});-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 ${10 * k}px ${b}88)">${hh}:${mm}</div></div>`;
-  }
-  const hist = (C.History || []).slice(0, 9);
-  const svcName = C.SkinService ? S.lists.services[C.SkinService] : "Spotify";
-  if (C.SkinList) {
-    const spOn = !!(S.spotify && S.spotify.connected);
-    const rows = hist.length ? hist : [{ Title: S.now.title || "Swim", Artist: S.now.artist || "Chase Atlantic" }, { Title: "R U Mine?", Artist: "Arctic Monkeys" }, { Title: "The Walls", Artist: "Chase Atlantic" }];
-    out += `<div class="sklist" style="transform:perspective(${1500 * k}px) rotateY(18deg);transform-origin:left center;left:${34 * k}px;top:16%;width:${360 * k}px;font-size:${Math.max(5, 16 * k)}px;padding:${10 * k}px ${4 * k}px">` +
-      `<div class="skhead" style="gap:${14 * k}px;margin-bottom:${20 * k}px"><i style="width:${50 * k}px;height:${50 * k}px;border-radius:${12 * k}px;${coverBG()}"></i><span><b style="font-size:1.3em">${spOn ? "Up Next" : "Recently Played"} ⌄</b><br><small>${spOn ? "Next on " + esc(svcName) : "Connect Spotify to see what's next"}</small></span><em style="width:${32 * k}px;height:${32 * k}px">↻</em></div>` +
-      rows.map((h, i) => { const on = (S.now && h.Title === S.now.title) || (!hist.length && i === 0);
-        return `<div class="skrow${on ? " on" : ""}" style="border-radius:${14 * k}px;padding:${8 * k}px;gap:${14 * k}px"><i style="width:${46 * k}px;height:${46 * k}px;border-radius:${8 * k}px;${on ? coverBG() : `background:linear-gradient(135deg,${fsHue(albumC, i * 40)},#222)`}"></i><span><b>${esc(h.Title)}</b><br><small>${esc(h.Artist)}</small></span></div>`; }).join("") + `</div>`;
-  }
-  if (C.SkinCentre === 0) out += `<div class="skcard" style="width:${380 * k}px;padding:${24 * k}px;border-radius:${26 * k}px;${glassCSS};font-size:${Math.max(5, 25 * k)}px"><i style="width:${300 * k}px;height:${300 * k}px;border-radius:${20 * k}px;${coverBG()}"></i><b>${esc(S.now.title || "Not playing")}</b><small>${esc(S.now.artist || "")}</small><em style="font-size:${Math.max(4, 13 * k)}px">● Playing on ${esc(svcName)}</em></div>`;
-  if (C.SkinCentre === 1) {
-    const per = C.SkinFlowCount || 3, cs = 230 * k, items = [{ t: S.now.title || "Not playing", a: S.now.artist || "", cur: true }, ...(hist.filter(h => h.Title !== S.now.title).slice(0, per * 2).map(h => ({ t: h.Title, a: h.Artist })))];
-    while (items.length < 1 + per * 2) items.push({ t: ["Tecca", "Flawed", "Generic", "Sunrise", "Moonlight", "Ransom"][items.length - 1], a: "Album" });
-    let fl = "";
-    items.forEach((it, i) => { const d = i === 0 ? 0 : (i % 2 ? -1 : 1) * Math.ceil(i / 2), a = Math.abs(d), sc = [1, .8, .64, .52][a], dx = [0, 1.02, 1.82, 2.48][a] * Math.sign(d), li = [1, .78, .6, .44][a];
-      fl += `<div class="skfc${d === 0 ? " front" : ""}" style="left:${dx * cs}px;width:${cs * 1.09}px;--sc:${sc};--ry:${-Math.sign(d) * 35}deg;filter:brightness(${li});z-index:${4 - a};padding:${cs * .045}px;border-radius:${cs * .07}px;font-size:${Math.max(4, cs * .062)}px${d === 0 ? ";background:linear-gradient(" + albumC + "40," + albumC + "10),linear-gradient(#302a30e0,#141218e0)" : ""}"><i style="width:${cs}px;height:${cs}px;border-radius:${cs * .045}px;${it.cur ? coverBG() : `background:linear-gradient(135deg,${fsHue(albumC, i * 50)},#111)`}"></i><b>${esc(it.t.toUpperCase())}</b><small>${esc(it.a)}</small></div>`; });
-    out += `<div class="skflow" style="top:50%">${fl}<div class="skdots" style="top:${cs * .82}px">${items.map((_, i) => `<b class="${i === per ? "on" : ""}"></b>`).join("")}</div></div>`;
-  }
-  if (C.SkinLyrics) out += `<div class="fslyr" style="left:76%;top:64%;font:${C.FsBold ? 800 : 400} ${Math.max(7, C.FsTextSize * k)}px '${esc(C.FsFont)}',Segoe UI,sans-serif;color:${txt};${fsLyricCSS(C.FsEffect, txt, acc)}">${esc(caseText("Love"))} <span style="color:${acc}">${esc(caseText("me"))}</span></div>`;
-  if (C.SkinBar) { const svc = C.SkinService ? S.lists.services[C.SkinService] : "Spotify", col = ["#b0b0bc", "#1ed760", "#1ed760", "#fa2d48", "#ff0033", "#ff5500", "#25d1da", "#ff0000"][C.SkinService];
-    out += `<div class="skbar2" style="width:${Math.min(940 * k, H * 16 / 9 * .64)}px;height:${84 * k}px;bottom:${36 * k}px;${glassCSS};font-size:${Math.max(4, 15 * k)}px;padding:0 ${14 * k}px">
-      <div class="sbsong"><i style="width:${56 * k}px;height:${56 * k}px;border-radius:${14 * k}px;${coverBG()}"></i><span><b>${esc(S.now.title || "Not Playing")}</b><br><small>${esc(S.now.artist || "")}</small></span></div>
-      <div class="sbmid"><div class="sbbtns" style="gap:${30 * k}px"><span class="sbmode" style="opacity:.75;font-size:.8em">⤮</span><span>⏮</span><b style="width:${46 * k}px;height:${46 * k}px;box-shadow:0 0 ${18 * k}px ${albumC}88">${S.now.playing ? "⏸" : "▶"}</b><span>⏭</span><span class="sbmode" style="opacity:.75;font-size:.8em">⟲</span></div>
-        <div class="sbline" style="gap:${10 * k}px;font-size:.7em"><small>1:12</small><em style="width:${940 * k * .34}px;height:${3 * k}px"><i style="width:38%;background:linear-gradient(90deg,${mix(albumC, "#ffffff", .3)},${albumC})"></i></em><small>3:48</small></div></div>
-      <div class="sbright" style="gap:${12 * k}px"><span class="sks" style="width:${230 * k}px;height:${40 * k}px;font-size:${Math.max(4, 14 * k)}px">⌕ Search ${esc(svc)}</span><b class="skdot" style="background:${col};width:${28 * k}px;height:${28 * k}px;font-size:${Math.max(4, 13 * k)}px;box-shadow:0 0 ${14 * k}px ${col}88">${svc[0]}</b></div></div>`; }
-  if (C.SkinFrame) out += `<canvas class="fsframe" data-glow="skin"></canvas>`;
-  return out;
+    valueChips("data-fsfps", "FsFPS", [[60, "60 fps"], [240, "Screen's rate · for 120/144 Hz"], [30, "30 fps · lighter"]]),
+    ...sec("Keys"), h("div", { class: "summary" }, ...keys.map(([k, v]) => h("div", {}, h("span", {}, v), h("b", {}, k))))];
 }
 
 /* ---------- Arrange / Performance / System ---------- */
@@ -1588,7 +1558,16 @@ function pagePerf() {
 }
 function pageGeneral() {
   const st = h("input", { type: "checkbox", checked: S.startup, "data-startup": "1", on: { change: e => action("startup", e.target.checked) } });
+  const langs = ["", "en", "tr", "ru"], cur = Math.max(0, langs.indexOf(C.Lang || ""));
+  const lang = h("div", { class: "chips", "data-key": "Lang" }, ...["Windows language", ...S.lists.langs].map((n, i) =>
+    h("button", { class: "chip" + (i === cur ? " on" : ""), ...(i ? { translate: false } : {}), on: { click: () => {
+      if (i === cur) return;
+      C.Lang = langs[i];
+      api("/api/set", { key: "Lang", value: langs[i] }).then(() => setTimeout(() => location.reload(), 150)).catch(offline);
+    } } }, n)));
   return [h("h1", {}, "System"),
+    ...sec("Language", "Menus, the full-screen view, the widgets and the dates. Windows language follows the language Windows is shown in."),
+    lang,
     ...sec("Startup"),
     h("div", { class: "row" }, label("Launch at login", "Start with Windows, quietly in the tray"), h("label", { class: "sw" }, st, h("span"))),
     ...sec("Updates", "New versions come from Orbit's GitHub page. Each one is signed — Orbit refuses any file that isn't."),
@@ -1606,7 +1585,7 @@ function pageGeneral() {
     ...sec("About"),
     h("div", { class: "summary" }, h("div", {}, h("span", {}, "Version"), h("b", {}, S.version)), h("div", {}, h("span", {}, "Lyrics"), h("b", {}, "lrclib.net")), h("div", {}, h("span", {}, "Audio capture"), h("b", {}, "WASAPI loopback (system audio)"))),
     h("div", { style: "height:14px" }),
-    h("div", { class: "row btnr" }, label("Quit Orbit", "Removes all widgets until you start it again"), h("button", { class: "btn danger", "data-act": "quit", on: { click: () => { action("quit"); document.body.innerHTML = "<p style='padding:40px'>Orbit has closed. You can close this window.</p>"; } } }, "Quit"))];
+    h("div", { class: "row btnr" }, label("Quit Orbit", "Removes all widgets until you start it again"), h("button", { class: "btn danger", "data-act": "quit", on: { click: () => { action("quit"); document.body.innerHTML = "<p style='padding:40px'>" + esc(T("Orbit has closed. You can close this window.")) + "</p>"; } } }, "Quit"))];
 }
 
 function render(keepScroll) {
@@ -1622,27 +1601,18 @@ function render(keepScroll) {
   s.append(...cur.build().filter(x => x != null));
   main.append(s);
   main.scrollTop = keepScroll ? y : 0;
-  watchMotion(s);
   updatePreview();
   updateSide();
-}
-
-// only what is on screen animates: tiles, cards and stages out of sight are paused
-const motionObs = "IntersectionObserver" in window ? new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle("offscreen", !e.isIntersecting)), { rootMargin: "80px" }) : null;
-function watchMotion(root) {
-  if (!motionObs) return;
-  motionObs.disconnect();
-  root.querySelectorAll(".tile,.card,.wbig,.fsstage,.sky,.place,.vis,.disc").forEach(el => motionObs.observe(el));
 }
 
 function showNow(n) {
   const prev = S && S.now ? S.now.coverVer : null;
   if (S) S.now = n;
-  document.getElementById("nowT").textContent = n.title || "Nothing playing";
-  document.getElementById("nowA").textContent = n.title ? n.artist : "Play something on Spotify";
+  document.getElementById("nowT").textContent = n.title || T("Nothing playing");
+  document.getElementById("nowA").textContent = n.title ? n.artist : T("Play something on Spotify");
   document.getElementById("nowS").innerHTML = n.title ? `<span class="dot ${n.playing ? "on" : ""}"></span>${n.playing ? "Playing" : "Paused"} · ${n.exact ? "exact sync" : "estimated sync"}` : "";
-  document.getElementById("pillT").textContent = n.title || "Nothing playing";
-  document.getElementById("pillA").textContent = n.title ? n.artist : "Play something on Spotify";
+  document.getElementById("pillT").textContent = n.title || T("Nothing playing");
+  document.getElementById("pillA").textContent = n.title ? n.artist : T("Play something on Spotify");
   const bg = n.cover ? `url('${coverURL()}')` : "";
   document.getElementById("nowArt").style.backgroundImage = bg;
   document.getElementById("pillArt").style.backgroundImage = bg;
@@ -1668,19 +1638,19 @@ function updateBox() {
   const u = S.update || {}, box = h("div", { class: "upbox", id: "updateBox" });
   let line, cls = "";
   if (u.checking) line = "Looking for updates…";
-  else if (u.downloading) line = `Downloading ${u.version} · ${Math.round((u.progress || 0) * 100)}%`;
-  else if (u.ready) { line = `Orbit ${u.version} is ready`; cls = "ok"; }
-  else if (u.version) line = `Orbit ${u.version} is out`;
-  else if (u.error) { line = u.error; cls = "bad"; }
-  else if (u.upToDate) { line = `You're on the newest version (${u.current})`; cls = "ok"; }
-  else line = `Version ${u.current || S.version}`;
-  const when = u.lastCheck ? "Last checked " + new Date(u.lastCheck * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Not checked yet";
+  else if (u.downloading) line = Tx("Downloading {x}", u.version) + ` · ${Math.round((u.progress || 0) * 100)}%`;
+  else if (u.ready) { line = T("Orbit {v} is ready").replace("{v}", u.version); cls = "ok"; }
+  else if (u.version) line = T("Orbit {v} is out").replace("{v}", u.version);
+  else if (u.error) { line = T(u.error); cls = "bad"; }
+  else if (u.upToDate) { line = T("You're on the newest version ({v})").replace("{v}", u.current); cls = "ok"; }
+  else line = T("Version {n}").replace("{n}", u.current || S.version);
+  const when = u.lastCheck ? Tx("Last checked {x}", new Date(u.lastCheck * 1000).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" })) : "Not checked yet";
   const stat = h("div", { class: "upstat " + cls, id: "upStatus" }, h("span", { class: "spdot" }), h("span", {}, h("b", {}, line), h("br"), h("small", {}, when)));
   const btn = u.ready
     ? h("button", { class: "btn primary", id: "upInstall", on: { click: () => { action("updateInstall", true); btn.textContent = "Restarting…"; btn.disabled = true; } } }, "Update now")
     : h("button", { class: "btn", id: "upCheck", disabled: !!(u.checking || u.downloading), on: { click: () => { action("updateCheck", true).then(() => pollUpdate(0)); } } }, "Check now");
   box.append(h("div", { class: "row btnr" }, stat, btn));
-  if (u.notes && (u.ready || u.version)) box.append(h("p", { class: "hint", id: "upNotes" }, "What's new: " + u.notes));
+  if (u.notes && (u.ready || u.version)) box.append(h("p", { class: "hint", id: "upNotes", translate: "no" }, T("What's new:") + " " + u.notes));
   if (u.error && u.version) box.append(h("p", { class: "hint bad" }, u.error));
   return box;
 }
@@ -1691,7 +1661,7 @@ async function pollUpdate(n) {
 function spotifyBox() {
   const sp = S.spotify || {}, box = h("div", { class: "spbox", id: "spotifyBox" });
   const status = h("div", { class: "spstat " + (sp.connected ? "ok" : ""), id: "spStatus" },
-    h("span", { class: "spdot" }), sp.connected ? (sp.error ? "Connected — last try: " + sp.error : sp.control ? "Connected · your queue, search, shuffle and repeat work in full screen" : "Connected · press Connect again so search can play songs and shuffle works") : "Not connected");
+    h("span", { class: "spdot" }), sp.connected ? (sp.error ? T("Connected — last try:") + " " + T(sp.error) : sp.control ? "Connected · your queue, search, shuffle and repeat work in full screen" : "Connected · press Connect again so search can play songs and shuffle works") : "Not connected");
   const id = h("input", { type: "text", id: "spClient", spellcheck: "false", autocomplete: "off", placeholder: "Client ID — 32 letters and numbers", value: C.SpotifyClientID || "",
     on: { change: e => { const v = e.target.value.trim(); C.SpotifyClientID = v; set("SpotifyClientID", v, true); setTimeout(reloadSpotify, 400); } } });
   const connect = h("button", { class: "btn primary", id: "spConnect", on: { click: () => {
@@ -1721,6 +1691,10 @@ async function reloadSpotify() {
 function markChips(key) { document.querySelectorAll(`.chips[data-key="${key}"]`).forEach(w => [...w.children].forEach((c, i) => c.classList.toggle("on", i === C[key]))); }
 
 async function load() {
+  await loadLang();
+  buildDF();
+  document.title = T("Orbit — Settings");
+  startTranslating();
   try {
     S = await api("/api/state");
     C = typeof S.config === "string" ? JSON.parse(S.config) : S.config;
@@ -1732,7 +1706,7 @@ async function load() {
     setConn(true);
   } catch (e) {
     setConn(false);
-    document.getElementById("main").innerHTML = "<h1>Can't reach Orbit</h1><p class='sub'>Is it still running? Open the settings again from the tray icon.</p>";
+    document.getElementById("main").innerHTML = "<h1>" + esc(T("Can't reach Orbit")) + "</h1><p class='sub'>" + esc(T("Is it still running? Open the settings again from the tray icon.")) + "</p>";
   }
 }
 setInterval(async () => {

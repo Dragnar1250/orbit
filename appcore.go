@@ -2,8 +2,7 @@
 
 package main
 
-// The desktop app's own logic, the same on Windows and Mac: where widgets are, settings
-// changes, the frame scheduler, which views draw. The windows themselves are platform code.
+// The app's shared core (Windows and Mac): widget state, redraw flags, frame rates.
 
 import (
 	"math"
@@ -198,27 +197,6 @@ func wantBands() bool {
 	return false
 }
 
-// uiScale: 1.0 on a 1080p screen, bigger on 1440p / 4K.
-func uiScale() float64 {
-	wa := workArea()
-	h := float64(wa.Bottom - wa.Top)
-	w := float64(wa.Right - wa.Left)
-	s := math.Min(w/1920, h/1040)
-	return math.Max(0.6, math.Min(3, s))
-}
-
-var (
-	needRedraw  = true
-	layoutDirty = true
-	styleDirty  = true
-	lastTrim    time.Time
-)
-
-var (
-	fpsNow       int32 // read by the frame loop
-	framePending int32 // 1 while a frame is waiting to be drawn
-)
-
 func applyFPS() { atomic.StoreInt32(&fpsNow, int32(cfg.FPS)) }
 
 // desktopFPS: the chosen frame rate while something moves; when nothing does (paused, nothing
@@ -253,7 +231,7 @@ func desktopFPS(snap MediaSnap, now time.Time) int32 {
 		return 2 // everything is behind the game: just keep the song position and lyrics in step
 	}
 	if snap.Playing && snap.Track != nil {
-		return int32(fps)
+		return int32(min(fps, deskCap))
 	}
 	idle := 10
 	if snap.Track == nil {
@@ -264,6 +242,52 @@ func desktopFPS(snap MediaSnap, now time.Time) int32 {
 	}
 	return int32(min(fps, idle))
 }
+
+// uiScale: 1.0 on a 1080p screen, bigger on 1440p / 4K.
+func uiScale() float64 {
+	wa := workArea()
+	h := float64(wa.Bottom - wa.Top)
+	w := float64(wa.Right - wa.Left)
+	s := math.Min(w/1920, h/1040)
+	return math.Max(0.6, math.Min(3, s))
+}
+
+// deskCap: the desktop's own frame-rate ceiling. When drawing a frame takes more than half
+// the time between frames (a big screen, a slow PC), the rate steps down (60 → 45 → 30 → 20),
+// so Orbit never keeps a core busy all the time and the rest of the PC stays smooth; it steps
+// back up when there is room again.
+var deskCap = 60
+
+var deskEMA float64 // ms
+
+func deskBudget(d time.Duration) {
+	ms := float64(d.Microseconds()) / 1000
+	deskEMA += (ms - deskEMA) * 0.05
+	per := 1000 / float64(min(max(cfg.FPS, 1), deskCap))
+	steps := []int{60, 45, 30, 20}
+	i := 0
+	for i < len(steps)-1 && steps[i] > deskCap {
+		i++
+	}
+	switch {
+	case deskEMA > per*0.5 && i < len(steps)-1:
+		deskCap, deskEMA = steps[i+1], deskEMA*0.8
+	case deskEMA < per*0.22 && i > 0:
+		deskCap = steps[i-1]
+	}
+}
+
+var (
+	needRedraw  = true
+	layoutDirty = true
+	styleDirty  = true
+	lastTrim    time.Time
+)
+
+var (
+	fpsNow       int32 // read by frameLoop
+	framePending int32 // 1 while a frame message is waiting in the queue
+)
 
 var (
 	gameCheckAt time.Time

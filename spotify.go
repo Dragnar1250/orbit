@@ -35,6 +35,7 @@ type queueItem struct {
 	ID, Title, Artist, Image string
 	File                     string // the picture, once downloaded
 	Dur                      float64
+	Album                    string
 }
 
 type spotifyState struct {
@@ -172,7 +173,8 @@ func parseQueue(b []byte) (playing string, items []queueItem) {
 			Name string `json:"name"`
 		} `json:"artists"`
 		Album struct {
-			Images []img `json:"images"`
+			Name   string `json:"name"`
+			Images []img  `json:"images"`
 		} `json:"album"`
 		Show struct { // podcast episodes
 			Name   string `json:"name"`
@@ -204,7 +206,7 @@ func parseQueue(b []byte) (playing string, items []queueItem) {
 	}
 	seen := 0
 	for _, t := range r.Queue {
-		it := queueItem{ID: t.ID, Title: t.Name, Dur: float64(t.Dur) / 1000}
+		it := queueItem{ID: t.ID, Title: t.Name, Dur: float64(t.Dur) / 1000, Album: t.Album.Name}
 		var names []string
 		for _, a := range t.Artists {
 			names = append(names, a.Name)
@@ -351,6 +353,7 @@ func (s *spotifyState) refreshQueue() {
 		s.Lock()
 		s.queue, s.queueFor, s.queueAt, s.lastErr = items, playing, time.Now(), ""
 		s.Unlock()
+		prefetchLyrics(items) // the next songs' lyrics are ready before they start
 		s.readPlayer()
 	}()
 }
@@ -375,24 +378,24 @@ func serveSpotify(w http.ResponseWriter, r *http.Request, port int) {
 			if !ok {
 				col = "#ff6b7a"
 			}
-			fmt.Fprintf(w, `<!doctype html><meta charset="utf-8"><title>Orbit</title><body style="background:#0e0f1a;color:#fff;font:16px Segoe UI,sans-serif;display:grid;place-items:center;height:90vh;margin:0"><div style="text-align:center"><div style="font-size:42px;color:%s">%s</div><p>%s</p><p style="opacity:.6">You can close this tab.</p></div>`,
-				col, map[bool]string{true: "✓", false: "✕"}[ok], htmlEscape(msg))
+			fmt.Fprintf(w, `<!doctype html><meta charset="utf-8"><title>Orbit</title><body style="background:#0e0f1a;color:#fff;font:16px Segoe UI,sans-serif;display:grid;place-items:center;height:90vh;margin:0"><div style="text-align:center"><div style="font-size:42px;color:%s">%s</div><p>%s</p><p style="opacity:.6">%s</p></div>`,
+				col, map[bool]string{true: "✓", false: "✕"}[ok], htmlEscape(msg), htmlEscape(T("You can close this tab.")))
 		}
 		if e := r.URL.Query().Get("error"); e != "" {
-			page(false, "Spotify sign-in was cancelled ("+e+").")
+			page(false, T("Spotify sign-in was cancelled")+" ("+e+").")
 			return
 		}
 		ref, scope, err := spotify.finishLogin(id, r.URL.Query().Get("code"), r.URL.Query().Get("state"), port)
 		if err != nil {
 			logf("spotify sign-in: %v", err)
-			page(false, "Couldn't connect: "+err.Error())
+			page(false, T("Couldn't connect:")+" "+T(err.Error()))
 			return
 		}
 		withCfg(func() { cfg.SpotifyRefresh, cfg.SpotifyScopes = ref, scope })
 		saveConfigSoon()
 		logf("spotify connected")
 		spotify.refreshQueue()
-		page(true, "Orbit is connected to your Spotify. Full screen now shows what plays next, and search plays songs right there.")
+		page(true, T("Orbit is connected to your Spotify. Full screen now shows what plays next, and search plays songs right there."))
 	default:
 		http.NotFound(w, r)
 	}

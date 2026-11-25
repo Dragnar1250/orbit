@@ -33,6 +33,7 @@ type Widget struct {
 	clickThrough bool
 	dragging     bool // the user is moving it right now — don't move it ourselves
 	offscreen    bool // only a canvas (full screen draws it itself): no window
+	frames       int  // offscreen: bumps every time the canvas was drawn again
 	ox, oy       int  // offscreen: where it would be
 }
 
@@ -86,6 +87,7 @@ func (w *Widget) g() uintptr {
 func (w *Widget) present() {
 	if w.offscreen {
 		w.visible = w.canvas != nil
+		w.frames++
 		return
 	}
 	if w.canvas == nil {
@@ -233,32 +235,6 @@ func setWidgetFlag(name, flag string, on bool) {
 	flash(name)
 	styleDirty = true
 	requestRedraw()
-}
-
-func showWidget(name string) {
-	flash(name)
-	if w := widgetByName(name); w != nil && w.visible && w.zAfter() == HWND_BOTTOM {
-		// pop it up for a moment so it can be seen even behind windows; it sinks back on the next move
-		call(pSetWindowPos, w.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE)
-		peekUntil[name] = time.Now().Add(2 * time.Second)
-	}
-	styleDirty = true
-	requestRedraw()
-}
-
-var peekUntil = map[string]time.Time{}
-
-// endPeeks sends widgets that were popped up by "Show me where it is" back to the desktop.
-func endPeeks() {
-	for name, t := range peekUntil {
-		if time.Now().After(t) {
-			delete(peekUntil, name)
-			if w := widgetByName(name); w != nil && w.zAfter() == HWND_BOTTOM {
-				call(pSetWindowPos, w.hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE)
-				call(pSetWindowPos, w.hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE)
-			}
-		}
-	}
 }
 
 func (w *Widget) setClickThrough(on bool) {
@@ -414,8 +390,8 @@ func removeTray() { call(pShellNotifyIconW, NIM_DELETE, uintptr(unsafe.Pointer(t
 func trayBalloon(title, text string) {
 	d := trayData()
 	d.UFlags |= NIF_INFO
-	t, _ := syscall.UTF16FromString(title)
-	m, _ := syscall.UTF16FromString(text)
+	t, _ := syscall.UTF16FromString(T(title))
+	m, _ := syscall.UTF16FromString(T(text))
 	copy(d.SzInfoTitle[:], t)
 	copy(d.SzInfo[:], m)
 	d.DwInfoFlags = 1
@@ -462,11 +438,19 @@ func menuItem(m uintptr, id int, text string, checked bool) {
 	if checked {
 		f |= MF_CHECKED
 	}
-	call(pAppendMenuW, m, f, uintptr(id), uintptr(unsafe.Pointer(u16(text))))
+	call(pAppendMenuW, m, f, uintptr(id), uintptr(unsafe.Pointer(u16(tMenu(text)))))
+}
+
+// tMenu translates a menu text, keeping a "\tshortcut" part as it is.
+func tMenu(s string) string {
+	if i := strings.IndexByte(s, '\t'); i >= 0 {
+		return T(s[:i]) + s[i:]
+	}
+	return T(s)
 }
 
 func subMenu(m uintptr, text string, sub uintptr) {
-	call(pAppendMenuW, m, MF_POPUP, sub, uintptr(unsafe.Pointer(u16(text))))
+	call(pAppendMenuW, m, MF_POPUP, sub, uintptr(unsafe.Pointer(u16(T(text)))))
 }
 
 func sep(m uintptr) { call(pAppendMenuW, m, MF_SEPARATOR, 0, 0) }
@@ -474,7 +458,7 @@ func sep(m uintptr) { call(pAppendMenuW, m, MF_SEPARATOR, 0, 0) }
 func showMenu() {
 	m := call(pCreatePopupMenu)
 	snap := media.Snapshot()
-	now := "Nothing playing"
+	now := T("Nothing playing")
 	if snap.Track != nil {
 		now = "♪ " + snap.Track.Title + " — " + snap.Track.Artist
 		if len([]rune(now)) > 60 {
@@ -488,7 +472,7 @@ func showMenu() {
 	menuItem(m, idFullscreen, "Full screen\tCtrl+Alt+F", fs != nil)
 	st := call(pCreatePopupMenu)
 	for i, n := range styleNames {
-		menuItem(st, idStyleBase+i, n, cfg.LyricsStyle == i)
+		menuItem(st, idStyleBase+i, tStyle(n), cfg.LyricsStyle == i)
 	}
 	subMenu(m, "Lyrics style", st)
 	menuItem(m, idRandom, "Lyrics in a random spot every line", cfg.LyricsPlace == 0)
@@ -498,7 +482,7 @@ func showMenu() {
 		base := idMoveBase + wi*32
 		if name == "vinyl" {
 			for ci, cn := range cornerNames {
-				menuItem(sub, base+moveCorner+ci, "Tuck into "+strings.ToLower(cn), cfg.VinylCorner == ci && !cfg.widget("vinyl").Set)
+				menuItem(sub, base+moveCorner+ci, upperFirst(strings.ReplaceAll(T("Tuck into {x}"), "{x}", strings.ToLower(T(cn)))), cfg.VinylCorner == ci && !cfg.widget("vinyl").Set)
 			}
 			sep(sub)
 		}
@@ -675,16 +659,16 @@ func settingsChanged(key string) {
 	switch key {
 	case "FPS":
 		applyFPS()
-		installMouseHook()
-		registerHotkey()
-		call(pSetTimer, mainHwnd, 1, 1000, 0) // safety net: keeps things alive if frames ever stall
-		go frameLoop()
 	case "OffsetSec":
 		media.SetOffset(cfg.OffsetSec)
 	case "WeatherF", "ShowWeather", "WeatherCity":
 		kickWeather()
 	case "VinylCorner", "TextSize", "ShowList", "LyricsPlace":
 		layoutDirty = true
+	case "Lang":
+		setLang(cfg.Lang)
+		layoutDirty = true
+		bannerSig = ""
 	}
 	saveConfigSoon()
 	styleDirty = true
@@ -701,8 +685,21 @@ var skippedFrame bool
 
 func frameLoop() {
 	next := time.Now()
+	gaveUp := false // no refresh signal on this PC (until full screen opens again)
 	for {
+		if vsyncOn.Load() == 1 && !gaveUp {
+			vsyncFrames() // in step with the screen while full screen is open
+			gaveUp = vsyncOn.Load() == 1
+			next = time.Now()
+			continue
+		}
+		if vsyncOn.Load() == 0 {
+			gaveUp = false
+		}
 		fps := atomic.LoadInt32(&fpsNow)
+		if fps > 60 {
+			fps = 60 // "the screen's rate" needs the screen's refresh signal; without it, 60
+		}
 		d := 200 * time.Millisecond // 0 fps: just follow the song (5 checks a second)
 		if fps > 0 {
 			d = time.Second / time.Duration(fps)
@@ -755,6 +752,7 @@ func installedFonts() []string {
 /* ===================== Main loop ===================== */
 
 func tick() {
+	ticks.Add(1)
 	defer func() {
 		if r := recover(); r != nil {
 			logf("PANIC while drawing: %v\n%s", r, debug.Stack())
@@ -765,11 +763,17 @@ func tick() {
 	endPeeks()
 	hoverCheck()
 	now := time.Now()
+	if fs != nil {
+		now = frameNow() // the screen refresh this frame follows
+	}
 	snap := media.Snapshot()
 	bands, bass, active := spectrum.Compute()
+	if demoOn() { // the test mode has no sound: a made-up beat instead
+		bands, bass, active = demoBands(now)
+	}
 	ui := uiScale()
 	if fs != nil { // full screen covers the desktop: only it is drawn
-		atomic.StoreInt32(&bandsWanted, 1)
+		atomic.StoreInt32(&bandsWanted, b2i(cfg.Motion != moStill || cfg.FsCover == 2)) // the stage's lyrics / the record move with the beat
 		fs.Update(now, snap, bands, bass)
 		needRedraw, layoutDirty, styleDirty = false, false, false
 		saveConfigIfDue(false)
@@ -778,14 +782,22 @@ func tick() {
 	if snap.Playing {
 		prefetchHiRes(snap.Track)
 	}
+	tickT0 := time.Now()
+	defer func() { deskBudget(time.Since(tickT0)) }()
 	if vinyl != nil {
+		dt0 := time.Now()
 		vinyl.Update(now, snap, bands, bass, ui)
+		deskProf("vinyl", dt0)
 	}
 	if halo != nil {
+		dt0 := time.Now()
 		halo.Update(now, snap, bands, bass, active, ui)
+		deskProf("halo", dt0)
 	}
 	if lyricView != nil {
+		dt0 := time.Now()
 		lyricView.Update(now, snap, bass, ui)
+		deskProf("lyrics", dt0)
 	}
 	if clockView != nil {
 		clockView.Update(now, snap, bass, ui)
@@ -825,6 +837,7 @@ func tick() {
 // tried in a child process: if anything there crashes, the app still runs (with fallbacks).
 func probeMain() {
 	runtime.LockOSThread()
+	setPriority(false)
 	fmt.Println("PROBE_START")
 	if s := newSMTC(); s != nil {
 		fmt.Println("SMTC_INIT")
@@ -938,6 +951,7 @@ func main() {
 		call(pSetProcessDPIAware)
 	}
 	loadConfig()
+	setLang(cfg.Lang)
 	media.SetOffset(cfg.OffsetSec)
 	if !gdipInit() {
 		messageBox("Could not start GDI+ (Windows graphics).", "Orbit")
@@ -946,7 +960,9 @@ func main() {
 	formats()
 
 	smtcOK, thumbOK, audioOK := runProbe()
-	go mediaLoop(smtcOK, thumbOK)
+	if !startDemo() {
+		go mediaLoop(smtcOK, thumbOK)
+	}
 	if audioOK {
 		go audioLoop()
 	} else {
@@ -1029,7 +1045,9 @@ func main() {
 	if _, err := os.Stat(filepath.Join(appDir(), "config.json")); err != nil {
 		trayBalloon("Orbit is running", "Click the Orbit icon here for settings. Right-click for the quick menu.")
 		saveConfigSoon()
-		openSettings()
+		if !demoOn() {
+			openSettings()
+		}
 	}
 	applyFPS()
 	installMouseHook()
@@ -1052,9 +1070,43 @@ func main() {
 	logf("exit")
 }
 
-// capture / releaseCapture / raiseTop: the window-system side of arranging (Windows).
-func (w *Widget) capture(on bool) { call(pSetCapture, w.hwnd) }
-func releaseCapture()             { call(pReleaseCapture) }
-func (w *Widget) raiseTop() {
-	call(pSetWindowPos, w.hwnd, ^uintptr(0), 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE) // HWND_TOPMOST
+// clearCanvas empties the widget's picture with a plain memory clear (GDI+'s Clear is very
+// slow on big canvases). Only for a canvas with no clip set.
+func (w *Widget) clearCanvas() {
+	c := w.canvas
+	if c == nil {
+		return
+	}
+	if px := pix(c); px != nil {
+		call(gpFlush, c.g, 1)
+		clear(px)
+		return
+	}
+	gClear(c.g, 0)
+}
+
+var peekUntil = map[string]time.Time{}
+
+// endPeeks sends widgets that were popped up by "Show me where it is" back to the desktop.
+func endPeeks() {
+	for name, t := range peekUntil {
+		if time.Now().After(t) {
+			delete(peekUntil, name)
+			if w := widgetByName(name); w != nil && w.zAfter() == HWND_BOTTOM {
+				call(pSetWindowPos, w.hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE)
+				call(pSetWindowPos, w.hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE)
+			}
+		}
+	}
+}
+
+func showWidget(name string) {
+	flash(name)
+	if w := widgetByName(name); w != nil && w.visible && w.zAfter() == HWND_BOTTOM {
+		// pop it up for a moment so it can be seen even behind windows; it sinks back on the next move
+		call(pSetWindowPos, w.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE)
+		peekUntil[name] = time.Now().Add(2 * time.Second)
+	}
+	styleDirty = true
+	requestRedraw()
 }

@@ -176,3 +176,25 @@ func nextPreset(cur string) string {
 	}
 	return colorPresets[0]
 }
+
+// scratchDelta: the turn from angle a to b (degrees), the short way round.
+func scratchDelta(a, b float64) float64 {
+	d := math.Mod(b-a+540, 360) - 180
+	if d == -180 {
+		d = 180
+	}
+	return d
+}
+
+// scratchPos: the song position after turning the record by deg degrees (positive = the way
+// it spins), one full turn = perTurn seconds; kept inside the song.
+func scratchPos(pos, deg, perTurn, dur float64) float64 {
+	pos += deg / 360 * perTurn
+	if pos < 0 {
+		pos = 0
+	}
+	if dur > 0 && pos > dur-0.5 {
+		pos = math.Max(0, dur-0.5)
+	}
+	return pos
+}

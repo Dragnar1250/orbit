@@ -55,18 +55,13 @@ Start-Sleep 2; Alive "widgets on"; Shot "02-widgets"
 for ($s = 0; $s -lt $state.styles.Count; $s++) { Set-Opt "LyricsStyle" $s; Start-Sleep -Milliseconds 250; Alive "lyrics style $s" }
 Act "editMode" $true; Start-Sleep 2; Alive "arrange mode"; Shot "03-arrange"; Act "editMode" $false
 
-# full screen: the music display, then the desktop skin with each background and middle
-Set-Opt "FsKind" 0
-Act "fullscreen" $true; Start-Sleep 5; Alive "music display"; Shot "04-music-display"
-Act "fullscreen" $false; Start-Sleep 2; Alive "leave full screen"
-Set-Opt "FsKind" 1
-Act "fullscreen" $true; Start-Sleep 5; Alive "desktop skin"; Shot "05-desktop-skin"
-$bgs = $state.lists.skinBgs.Count
-for ($b = 0; $b -lt $bgs; $b++) { Set-Opt "SkinBg" $b; Start-Sleep -Milliseconds 1200; Alive "skin background $b" }
-Shot "06-skin-last-bg"
-for ($m = 0; $m -lt 3; $m++) { Set-Opt "SkinCentre" $m; foreach ($n in 1, 2, 3) { Set-Opt "SkinFlowCount" $n; Start-Sleep -Milliseconds 500; Alive "middle $m / $n" } }
-foreach ($k in "SkinList", "SkinBar", "SkinClock", "SkinLyrics", "SkinFrame") { Set-Opt $k $false; Start-Sleep -Milliseconds 400; Set-Opt $k $true; Alive "toggle $k" }
-Shot "07-skin-flow"
+# full screen (Cinema): covers, backgrounds, a few stages, the languages
+Act "fullscreen" $true; Start-Sleep 5; Alive "Cinema"; Shot "04-cinema"
+foreach ($c in 0, 2) { for ($b = 0; $b -lt $state.lists.fsBgs.Count; $b++) { Set-Opt "FsCover" $c; Set-Opt "FsBg" $b; Start-Sleep -Milliseconds 900; Alive "cover $c / background $b" } }
+foreach ($st in 0, 1, 12, 28, 30, 31) { Set-Opt "FsStage" $st; Start-Sleep -Milliseconds 900; Alive "stage $st" }
+Shot "05-cinema-stage"
+foreach ($l in "tr", "ru", "en") { Set-Opt "Lang" $l; Start-Sleep -Milliseconds 700; Alive "language $l" }
+Shot "06-cinema-last"
 Act "fullscreen" $false; Start-Sleep 2
 # open and close it quickly many times
 for ($i = 0; $i -lt 8; $i++) { Act "fullscreen" $true; Start-Sleep -Milliseconds 300; Act "fullscreen" $false; Start-Sleep -Milliseconds 300 }

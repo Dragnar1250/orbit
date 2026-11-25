@@ -5,6 +5,7 @@ package main
 
 import (
 	"math"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -28,6 +29,8 @@ var (
 	gpScaleWorldTransform                    = gdiplus.NewProc("GdipScaleWorldTransform")
 	gpResetWorldTransform                    = gdiplus.NewProc("GdipResetWorldTransform")
 	gpDrawImageRect                          = gdiplus.NewProc("GdipDrawImageRect")
+	gpCreateImageAttributes                  = gdiplus.NewProc("GdipCreateImageAttributes")
+	gpSetImageAttributesColorMatrix          = gdiplus.NewProc("GdipSetImageAttributesColorMatrix")
 	gpDrawImageRectI                         = gdiplus.NewProc("GdipDrawImageRectI")
 	gpCreateSolidFill                        = gdiplus.NewProc("GdipCreateSolidFill")
 	gpSetSolidFillColor                      = gdiplus.NewProc("GdipSetSolidFillColor")
@@ -50,6 +53,8 @@ var (
 	gpAddPathEllipse                         = gdiplus.NewProc("GdipAddPathEllipse")
 	gpAddPathArc                             = gdiplus.NewProc("GdipAddPathArc")
 	gpClosePathFigure                        = gdiplus.NewProc("GdipClosePathFigure")
+	gpAddPathClosedCurve2                    = gdiplus.NewProc("GdipAddPathClosedCurve2")
+	gpAddPathLine2                           = gdiplus.NewProc("GdipAddPathLine2")
 	gpAddPathString                          = gdiplus.NewProc("GdipAddPathString")
 	gpFillPath                               = gdiplus.NewProc("GdipFillPath")
 	gpDrawPath                               = gdiplus.NewProc("GdipDrawPath")
@@ -85,9 +90,6 @@ var (
 	gpFillPolygon                            = gdiplus.NewProc("GdipFillPolygon")
 	gpSetPathGradientCenterColor             = gdiplus.NewProc("GdipSetPathGradientCenterColor")
 	gpSetPathGradientSurroundColorsWithCount = gdiplus.NewProc("GdipSetPathGradientSurroundColorsWithCount")
-	gpSetPathFillMode                        = gdiplus.NewProc("GdipSetPathFillMode")
-	gpAddPathPath                            = gdiplus.NewProc("GdipAddPathPath")
-	gpDrawImageRectRect                      = gdiplus.NewProc("GdipDrawImageRectRect")
 )
 
 const (
@@ -95,6 +97,7 @@ const (
 	smoothingAntiAlias            = 4
 	interpBilinear                = 3
 	interpHighQualityBicubic      = 7
+	interpHighQualityBilinear     = 6
 	textHintAntiAlias             = 4
 	pixelOffsetHalf               = 4
 	unitWorld                     = 0
@@ -148,9 +151,114 @@ type Bitmap struct {
 	bmp  uintptr
 	g    uintptr
 	w, h int
+	px   []uint32 // a copy of its pixels, once asked for (only for bitmaps finished when made)
+}
+
+var (
+	gpGetWorldTransform = gdiplus.NewProc("GdipGetWorldTransform")
+	gpSetWorldTransform = gdiplus.NewProc("GdipSetWorldTransform")
+	gpCreateMatrixE     = gdiplus.NewProc("GdipCreateMatrix")
+	gpCreateMatrix2     = gdiplus.NewProc("GdipCreateMatrix2")
+	gpGetMatrixElements = gdiplus.NewProc("GdipGetMatrixElements")
+	gpDeleteMatrixE     = gdiplus.NewProc("GdipDeleteMatrix")
+)
+
+// getTransform / setTransform: the drawing transform, saved and put back (6 numbers).
+func getTransform(g uintptr) (m [6]float32) {
+	var mx uintptr
+	call(gpCreateMatrixE, uintptr(unsafe.Pointer(&mx)))
+	if mx == 0 {
+		return [6]float32{1, 0, 0, 1, 0, 0}
+	}
+	call(gpGetWorldTransform, g, mx)
+	call(gpGetMatrixElements, mx, uintptr(unsafe.Pointer(&m[0])))
+	call(gpDeleteMatrixE, mx)
+	return
+}
+
+func setTransform(g uintptr, m [6]float32) {
+	var mx uintptr
+	call(gpCreateMatrix2, fl(m[0]), fl(m[1]), fl(m[2]), fl(m[3]), fl(m[4]), fl(m[5]), uintptr(unsafe.Pointer(&mx)))
+	if mx == 0 {
+		return
+	}
+	call(gpSetWorldTransform, g, mx)
+	call(gpDeleteMatrixE, mx)
+}
+
+var (
+	gpBitmapLockBits   = gdiplus.NewProc("GdipBitmapLockBits")
+	gpBitmapUnlockBits = gdiplus.NewProc("GdipBitmapUnlockBits")
+	gpFlush            = gdiplus.NewProc("GdipFlush")
+)
+
+// edit: change its pixels in Go (premultiplied BGRA, w×h, row by row).
+func (b *Bitmap) edit(f func(px []uint32, w, h int)) {
+	if b == nil || b.bmp == 0 {
+		return
+	}
+	call(gpFlush, b.g, 1)
+	type bitmapData struct {
+		w, h     uint32
+		stride   int32
+		format   int32
+		scan0    uintptr
+		reserved uintptr
+	}
+	r := [4]int32{0, 0, int32(b.w), int32(b.h)}
+	var d bitmapData
+	if st := call(gpBitmapLockBits, b.bmp, uintptr(unsafe.Pointer(&r)), 3, pixelFormat32bppPARGB, uintptr(unsafe.Pointer(&d))); st != 0 || d.scan0 == 0 {
+		return
+	}
+	px := make([]uint32, b.w*b.h)
+	row := func(y int) []uint32 {
+		return unsafe.Slice((*uint32)(unsafe.Pointer(d.scan0+uintptr(int(d.stride)*y))), b.w)
+	}
+	for y := 0; y < b.h; y++ {
+		copy(px[y*b.w:(y+1)*b.w], row(y))
+	}
+	f(px, b.w, b.h)
+	for y := 0; y < b.h; y++ {
+		copy(row(y), px[y*b.w:(y+1)*b.w])
+	}
+	call(gpBitmapUnlockBits, b.bmp, uintptr(unsafe.Pointer(&d)))
+	b.px = nil
+}
+
+// pixels: its premultiplied BGRA pixels (read once and kept; nil if that fails).
+func (b *Bitmap) pixels() []uint32 {
+	if b == nil || b.bmp == 0 {
+		return nil
+	}
+	if b.px != nil {
+		return b.px
+	}
+	type bitmapData struct {
+		w, h     uint32
+		stride   int32
+		format   int32
+		scan0    uintptr
+		reserved uintptr
+	}
+	r := [4]int32{0, 0, int32(b.w), int32(b.h)}
+	var d bitmapData
+	if st := call(gpBitmapLockBits, b.bmp, uintptr(unsafe.Pointer(&r)), 1, pixelFormat32bppPARGB, uintptr(unsafe.Pointer(&d))); st != 0 || d.scan0 == 0 {
+		return nil
+	}
+	px := make([]uint32, b.w*b.h)
+	for y := 0; y < b.h; y++ {
+		copy(px[y*b.w:(y+1)*b.w], unsafe.Slice((*uint32)(unsafe.Pointer(d.scan0+uintptr(int(d.stride)*y))), b.w))
+	}
+	call(gpBitmapUnlockBits, b.bmp, uintptr(unsafe.Pointer(&d)))
+	b.px = px
+	return px
 }
 
 // newBitmap creates a GDI+ owned premultiplied ARGB bitmap (used for cached layers).
+// live: how many of each are alive (the test mode writes them: a number that keeps growing is a leak)
+var liveCanvas, liveBitmap, liveImage, liveFont atomic.Int64
+var canvasMade, bitmapMade atomic.Int64 // how many were ever made (churn)
+
 func newBitmap(w, h int) *Bitmap {
 	if w < 1 {
 		w = 1
@@ -163,6 +271,8 @@ func newBitmap(w, h int) *Bitmap {
 	if b.bmp == 0 {
 		return nil
 	}
+	liveBitmap.Add(1)
+	bitmapMade.Add(1)
 	call(gpGetImageGraphicsContext, b.bmp, uintptr(unsafe.Pointer(&b.g)))
 	setupGraphics(b.g)
 	return b
@@ -172,12 +282,14 @@ func (b *Bitmap) Free() {
 	if b == nil {
 		return
 	}
+	b.px = nil
 	if b.g != 0 {
 		call(gpDeleteGraphics, b.g)
 		b.g = 0
 	}
 	if b.bmp != 0 {
 		call(gpDisposeImage, b.bmp)
+		liveBitmap.Add(-1)
 		b.bmp = 0
 	}
 }
@@ -222,12 +334,17 @@ func newCanvas(w, h int) *Canvas {
 	call(gpCreateBitmapFromScan0, uintptr(w), uintptr(h), uintptr(w*4), pixelFormat32bppPARGB, c.bits, uintptr(unsafe.Pointer(&c.bmp)))
 	call(gpGetImageGraphicsContext, c.bmp, uintptr(unsafe.Pointer(&c.g)))
 	setupGraphics(c.g)
+	liveCanvas.Add(1)
+	canvasMade.Add(1)
 	return c
 }
 
 func (c *Canvas) Free() {
 	if c == nil {
 		return
+	}
+	if c.dib != 0 {
+		liveCanvas.Add(-1)
 	}
 	if c.g != 0 {
 		call(gpDeleteGraphics, c.g)
@@ -401,12 +518,16 @@ func newFont(name string, size float32, bold bool) *Font {
 	}
 	f := &Font{family: fontFamily(name), size: size, style: st}
 	call(gpCreateFont, f.family, fl(size), uintptr(st), unitPixel, uintptr(unsafe.Pointer(&f.font)))
+	if f.font != 0 {
+		liveFont.Add(1)
+	}
 	return f
 }
 
 func (f *Font) Free() {
 	if f != nil && f.font != 0 {
 		call(gpDeleteFont, f.font)
+		liveFont.Add(-1)
 		f.font = 0
 	}
 }
@@ -527,6 +648,53 @@ func addTextPath(path uintptr, f *Font, s string, x, y float32) {
 	call(gpAddPathString, path, uintptr(unsafe.Pointer(&w[0])), uintptr(len(w)-1), f.family, uintptr(f.style), fl(f.size), uintptr(unsafe.Pointer(&r)), typoFormat)
 }
 
+// textPaths: each word's outline, made once at (0, 0) and filled wherever it is needed (moved
+// by the drawing transform). Building an outline from the font is the slow part of drawing big
+// words, and the lyrics draw the same words again every frame.
+type textPathKey struct {
+	fam   uintptr
+	size  float32
+	style int
+	s     string
+}
+
+type textPathEntry struct {
+	path     uintptr
+	w, h     float32
+	measured bool
+}
+
+var textPaths = map[textPathKey]*textPathEntry{}
+
+func cachedTextPath(f *Font, s string) *textPathEntry {
+	k := textPathKey{f.family, f.size, f.style, s}
+	if e, ok := textPaths[k]; ok {
+		return e
+	}
+	if len(textPaths) >= 700 { // plenty for a few lines in every style; start again past that
+		flushTextPaths()
+	}
+	e := &textPathEntry{path: newPath()}
+	addTextPath(e.path, f, s, 0, 0)
+	textPaths[k] = e
+	return e
+}
+
+func flushTextPaths() {
+	for _, e := range textPaths {
+		freePath(e.path)
+	}
+	textPaths = map[textPathKey]*textPathEntry{}
+}
+
+func (e *textPathEntry) size(f *Font, s string) (float32, float32) {
+	if !e.measured {
+		e.w, e.h = measure(f, s)
+		e.measured = true
+	}
+	return e.w, e.h
+}
+
 // drawGlowPath fills a path with an optional soft glow + drop shadow.
 func drawGlowPath(g, path uintptr, fill uint32, glow uint32, glowAmt float32, shadow bool) {
 	if shadow {
@@ -566,12 +734,16 @@ func imageFromBytes(b []byte) uintptr {
 	if call(gpLoadImageFromStream, stream, uintptr(unsafe.Pointer(&img))) != 0 {
 		return 0
 	}
+	liveImage.Add(1)
 	return img
 }
 
 func imageFromFile(path string) uintptr {
 	var img uintptr
 	call(gpLoadImageFromFile, uintptr(unsafe.Pointer(u16(path))), uintptr(unsafe.Pointer(&img)))
+	if img != 0 {
+		liveImage.Add(1)
+	}
 	return img
 }
 
@@ -591,6 +763,7 @@ func imageSize(img uintptr) (int, int) {
 func freeImage(img uintptr) {
 	if img != 0 {
 		call(gpDisposeImage, img)
+		liveImage.Add(-1)
 	}
 }
 
@@ -606,48 +779,104 @@ func hiconFromBitmap(b *Bitmap) uintptr {
 	return h
 }
 
-/* ---------- small helpers (the same names exist on the Mac, over Core Graphics) ---------- */
-
-func setTextHint(g uintptr, hint int) { call(gpSetTextRenderingHint, g, uintptr(hint)) }
-func setInterp(g uintptr, mode int)   { call(gpSetInterpolationMode, g, uintptr(mode)) }
-func setCopyMode(g uintptr, copy bool) {
-	m := uintptr(0)
-	if copy {
-		m = 1
-	}
-	call(gpSetCompositingMode, g, m)
-}
-func drawPathPen(g, pen, path uintptr) { call(gpDrawPath, g, pen, path) }
-func penDash(p uintptr)                { call(gpSetPenDashStyle, p, dashStyleDash) }
-func drawArc(g, pen uintptr, x, y, w, h, start, sweep float32) {
-	call(gpDrawArc, g, pen, fl(x), fl(y), fl(w), fl(h), fl(start), fl(sweep))
-}
-func drawLinePen(g, pen uintptr, x1, y1, x2, y2 float32) {
-	call(gpDrawLine, g, pen, fl(x1), fl(y1), fl(x2), fl(y2))
-}
-func addEllipse(path uintptr, x, y, w, h float32) {
-	call(gpAddPathEllipse, path, fl(x), fl(y), fl(w), fl(h))
-}
-func addPath(path, other uintptr) { call(gpAddPathPath, path, other, 0) }
-func pathWinding(path uintptr)    { call(gpSetPathFillMode, path, 1) }
-
-// gImageSrc draws the part (sx, sy, sw, sh) of an image into (x, y, w, h).
-func gImageSrc(g, img uintptr, x, y, w, h, sx, sy, sw, sh float32) {
-	call(gpDrawImageRectRect, g, img, fl(x), fl(y), fl(w), fl(h), fl(sx), fl(sy), fl(sw), fl(sh), 2, 0, 0, 0)
-}
-
-// radialFill: an ellipse that fades from center to surround.
-func radialFill(g uintptr, cx, cy, rx, ry float32, center, surround uint32) {
+// closedCurvePath: a smooth closed curve through pts (tension 0..1).
+func closedCurvePath(pts []PointF, tension float32) uintptr {
 	p := newPath()
-	addEllipse(p, cx-rx, cy-ry, 2*rx, 2*ry)
-	var br uintptr
-	call(gpCreatePathGradientFromPath, p, uintptr(unsafe.Pointer(&br)))
-	if br != 0 {
-		call(gpSetPathGradientCenterColor, br, uintptr(center))
-		n := int32(1)
-		call(gpSetPathGradientSurroundColorsWithCount, br, uintptr(unsafe.Pointer(&surround)), uintptr(unsafe.Pointer(&n)))
-		call(gpFillPath, g, br, p)
-		call(gpDeleteBrush, br)
+	if len(pts) > 2 {
+		call(gpAddPathClosedCurve2, p, uintptr(unsafe.Pointer(&pts[0])), uintptr(len(pts)), fl(tension))
 	}
-	freePath(p)
+	return p
+}
+
+// polylinePath: an open line through pts.
+func polylinePath(pts []PointF) uintptr {
+	p := newPath()
+	if len(pts) > 1 {
+		call(gpAddPathLine2, p, uintptr(unsafe.Pointer(&pts[0])), uintptr(len(pts)))
+	}
+	return p
+}
+
+// imgAttr: one reusable ImageAttributes for drawing images see-through (UI thread only).
+var imgAttr uintptr
+
+// gImageAlpha draws img (iw × ih source pixels) into (x, y, w, h) at opacity a (0..1).
+func gImageAlpha(g, img uintptr, iw, ih int, x, y, w, h float32, a float64) {
+	if a >= 0.999 {
+		gImage(g, img, x, y, w, h)
+		return
+	}
+	if a <= 0.004 {
+		return
+	}
+	if imgAttr == 0 {
+		call(gpCreateImageAttributes, uintptr(unsafe.Pointer(&imgAttr)))
+		if imgAttr == 0 {
+			gImage(g, img, x, y, w, h)
+			return
+		}
+	}
+	var m [25]float32
+	m[0], m[6], m[12], m[18], m[24] = 1, 1, 1, float32(a), 1
+	call(gpSetImageAttributesColorMatrix, imgAttr, 0, 1, uintptr(unsafe.Pointer(&m[0])), 0, 0)
+	const unitPixel = 2
+	call(gpDrawImageRectRect, g, img, fl(x), fl(y), fl(w), fl(h), fl(0), fl(0), fl(float32(iw)), fl(float32(ih)), unitPixel, imgAttr, 0, 0)
+}
+
+var (
+	gpSetImageAttributesWrapMode = gdiplus.NewProc("GdipSetImageAttributesWrapMode")
+	gpGetInterpolationMode       = gdiplus.NewProc("GdipGetInterpolationMode")
+	gpCreateTextureE             = gdiplus.NewProc("GdipCreateTexture")
+	gpTranslateTextureTransform  = gdiplus.NewProc("GdipTranslateTextureTransform")
+	wrapAttr                     uintptr
+)
+
+// gImageHQ draws a picture with the best filter GDI+ has, and without the half-see-through
+// fringe its edges get otherwise (the edge pixels are mirrored instead of blended with nothing).
+// For pictures drawn once into a cached layer — covers, labels — not for every frame.
+func gImageHQ(g, img uintptr, x, y, w, h float32) {
+	iw, ih := imageSize(img)
+	if iw <= 0 || ih <= 0 {
+		return
+	}
+	if wrapAttr == 0 {
+		call(gpCreateImageAttributes, uintptr(unsafe.Pointer(&wrapAttr)))
+		if wrapAttr != 0 {
+			call(gpSetImageAttributesWrapMode, wrapAttr, 3, 0, 0) // WrapModeTileFlipXY
+		}
+	}
+	var mode int32
+	call(gpGetInterpolationMode, g, uintptr(unsafe.Pointer(&mode)))
+	call(gpSetInterpolationMode, g, interpHighQualityBicubic)
+	if wrapAttr != 0 {
+		call(gpDrawImageRectRect, g, img, fl(x), fl(y), fl(w), fl(h), fl(0), fl(0), fl(float32(iw)), fl(float32(ih)), 2, wrapAttr, 0, 0)
+	} else {
+		gImage(g, img, x, y, w, h)
+	}
+	call(gpSetInterpolationMode, g, uintptr(mode))
+}
+
+// fillPathCover fills path with the cover (cropped to a square s wide at x, y) — with smooth
+// edges. A clip path has hard, stair-stepped edges; this draws the cover at its final size once,
+// then fills the shape with it, so round corners and round labels come out clean.
+func fillPathCover(g, img uintptr, x, y, s float32, path uintptr) {
+	n := int(math.Ceil(float64(s))) + 2
+	if img == 0 || n < 2 || n > 4096 {
+		return
+	}
+	b := newBitmap(n, n)
+	if b == nil {
+		return
+	}
+	defer b.Free()
+	gClear(b.g, 0)
+	drawCoverSquare(b.g, img, 1, 1, s)
+	var tb uintptr
+	call(gpCreateTextureE, b.bmp, 0, uintptr(unsafe.Pointer(&tb)))
+	if tb == 0 {
+		return
+	}
+	call(gpTranslateTextureTransform, tb, fl(x-1), fl(y-1), 0)
+	call(gpFillPath, g, tb, path)
+	call(gpDeleteBrush, tb)
 }

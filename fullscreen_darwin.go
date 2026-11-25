@@ -2,12 +2,12 @@
 
 package main
 
-// Full screen on the Mac: the same FullView as on Windows (fullscreen.go, skinview.go); this is
-// its window, input, the music video window and the player controls it uses.
+// Full screen (Cinema) on the Mac: the same view as on Windows (fullscreen.go, cinemaview.go);
+// this is its window, its keys and mouse, and the player controls it uses.
 
 /*
 #cgo CFLAGS: -fobjc-arc -Wno-deprecated-declarations
-#cgo LDFLAGS: -framework Cocoa -framework QuartzCore -framework WebKit
+#cgo LDFLAGS: -framework Cocoa -framework QuartzCore
 #include <stdlib.h>
 #include "gdip_darwin.h"
 #include "app_darwin.h"
@@ -56,28 +56,15 @@ func openFullscreen() {
 	setHover("")
 	m := fsMonitor()
 	W, H := int(m.Right-m.Left), int(m.Bottom-m.Top)
-	f := &FullView{winW: W, winH: H, mon: m, last: time.Now(), ver: -1, lyrIdx: -3, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
-	// big screens: draw at about 1080p and stretch — each pixel costs, and 4K has four times as many
-	q := 1.0
-	if W*H > 1920*1200 { // Retina: about 1920×1200 worth of pixels, the GPU stretches the rest
-		q = math.Sqrt(1920 * 1200 / float64(W*H))
-	}
-	f.maxQ = q
-	if !f.setupBuffers(q) {
+	f := &FullView{winW: W, winH: H, mon: m, q: 1, last: time.Now(), ver: -1}
+	if !f.cinemaAlloc() {
 		f.free()
 		logf("full screen: out of memory for %dx%d", W, H)
 		return
 	}
-	f.vin = &VinylView{w: offscreenWidget("vinyl"), last: time.Now(), version: -1, sx: 1, sy: 1, armT: 0}
-	f.hal = &HaloView{w: offscreenWidget("halo"), last: time.Now()}
 	f.lyr = &LyricsView{w: offscreenWidget("lyrics"), version: -1, idx: -2, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
-	f.glow = newGlowView()
-	f.glow.mons, f.glow.prim = []RECT{{0, 0, int32(f.W), int32(f.H)}}, []bool{true}
-	f.stars = make([]fsStar, 180)
-	for i := range f.stars {
-		f.stars[i] = f.newStar(true)
-	}
-	f.mouseAt, f.hintAt = time.Now(), time.Now()
+	f.vin = &VinylView{w: offscreenWidget("vinyl"), last: time.Now(), version: -1, sx: 1, sy: 1, armT: 0, swapT: -1}
+	f.mouseAt = time.Now()
 	fs = f
 	f.hwnd = uintptr(C.fs_open(C.double(m.Left), C.double(m.Top), C.double(W), C.double(H)))
 	if glowView != nil {
@@ -88,9 +75,21 @@ func openFullscreen() {
 			w.hide()
 		}
 	}
-	atomic.StoreInt32(&fpsNow, int32(cfg.FsFPS))
-	logf("full screen on %dx%d", W, H)
+	atomic.StoreInt32(&fpsNow, int32(fsRate()))
+	f.say("Press H for shortcuts")
+	logf("full screen (Cinema) on %dx%d", W, H)
 	buildMenu()
+}
+
+// fsRate: Cinema's frames a second (60, the screen's own rate up to 120 on ProMotion, or 30).
+func fsRate() int {
+	switch cfg.FsFPS {
+	case 30:
+		return 30
+	case 240:
+		return 120
+	}
+	return 60
 }
 
 func closeFullscreen() {
@@ -100,10 +99,6 @@ func closeFullscreen() {
 	}
 	fs = nil
 	C.fs_close()
-	f.edgeStop()
-	video.Lock()
-	video.Want = false
-	video.Unlock()
 	f.free()
 	applyFPS()
 	needRedraw, layoutDirty, styleDirty = true, true, true
@@ -113,23 +108,18 @@ func closeFullscreen() {
 	buildMenu()
 }
 
-// gpuUpscale: on the Mac the layer stretches a smaller frame on the GPU (Retina screens have 3–6×
-// the pixels of 1080p; drawing all of them in software is what made full screen heavy).
-const gpuUpscale = true
-
-func (f *FullView) blit() {
-	if f.buf == nil || f.hwnd == 0 {
-		return
+// cinemaPresent: the finished frame to the screen (the layer shows it; nothing is drawn twice).
+func (f *FullView) cinemaPresent(full bool, dirty []rectF) {
+	if c := &f.cin; c.buf != nil && f.hwnd != 0 {
+		C.fs_show(og(c.buf.g))
 	}
-	C.fs_show(og(f.buf.g))
 }
 
-func (f *FullView) blend(c *Canvas, x, y int, alpha byte) {
-	if c == nil || alpha == 0 || f.buf == nil {
-		return
-	}
-	C.og_blend(og(f.buf.g), og(c.g), C.float(x), C.float(y), C.float(float64(alpha)/255))
-}
+// refreshNs, vsyncMode: for Cinema's log line (the Mac's frames come from its display link).
+var refreshNs, vsyncMode atomic.Int64
+
+// frameNow: the time this frame shows (the display link calls at each refresh)
+func frameNow() time.Time { return time.Now() }
 
 // goFSEvent: the full-screen window's keys and mouse. x, y: window pixels.
 //
@@ -144,30 +134,41 @@ func goFSEvent(kind C.int, x, y C.double, data C.int) {
 			logf("full screen input panic: %v\n%s", r, debug.Stack())
 		}
 	}()
-	q := float32(f.q)
-	fx, fy := float32(x)*q, float32(y)*q
+	fx, fy := float64(x), float64(y)
 	switch kind {
 	case 1:
-		f.onKey(int(data))
-	case 2:
-		f.onChar(rune(data))
+		f.cinemaKey(int(data))
 	case 3:
-		f.onDown(fx, fy)
+		f.wake()
+		f.cinemaDown(fx, fy)
 	case 4:
-		f.onUp(fx)
+		f.cinemaUp()
 	case 5:
-		f.onDouble(fx, fy)
+		f.wake()
+		if !f.cinemaDown(fx, fy) {
+			closeFullscreen()
+		}
 	case 6:
-		f.onRight()
+		f.wake()
+		showMenu()
 	case 7:
-		f.onWheel(fx, fy, int(data))
+		f.wake()
+		f.cinemaWheel(data > 0)
 	case 8:
-		f.onMove(POINT{int32(x), int32(y)}, fx, fy)
+		pt := POINT{int32(x), int32(y)}
+		if pt != f.mousePt {
+			f.mousePt = pt
+			f.wake()
+			f.cinemaMove(fx, fy)
+		}
 	case 9:
 		closeFullscreen()
 	}
 	requestRedraw()
 }
+
+// ctrlDown: Control or Command held (Cinema's ⌃/⌘ + arrows: previous / next song)
+func ctrlDown() bool { return C.os_ctrl_down() != 0 }
 
 func fsInFront(f *FullView) bool   { return C.fs_in_front() != 0 }
 func showCursor(on bool)           { C.fs_cursor(C.int(b2i(on))) }
@@ -200,55 +201,6 @@ func popupMenu(items []string, checked int, owner uintptr) int {
 	copy(sl, cs)
 	return int(C.os_popup((**C.char)(arr), C.int(len(cs)), C.int(checked)))
 }
-
-/* ---------- the music video ---------- */
-
-type edgeVideo struct {
-	open      bool
-	notWanted time.Time
-	started   time.Time
-	failed    bool
-}
-
-func (f *FullView) videoTick(snap MediaSnap, want bool, now time.Time) {
-	e := &f.edge
-	video.Lock()
-	video.Want = want
-	seen := video.Seen
-	video.Unlock()
-	if !want {
-		if e.notWanted.IsZero() {
-			e.notWanted = now
-		}
-		if now.Sub(e.notWanted) > 5*time.Second {
-			f.edgeStop()
-		}
-		f.videoOn = false
-		return
-	}
-	e.notWanted = time.Time{}
-	video.forSong(snap.Track)
-	if !e.open && settingsSrv != nil {
-		u := fmt.Sprintf("http://127.0.0.1:%d/video?t=%s", settingsSrv.port, settingsSrv.token)
-		s := C.CString(u)
-		C.fs_video_open(s)
-		C.free(unsafe.Pointer(s))
-		e.open, e.started = true, now
-		logf("video: WebKit window opened")
-	}
-	// see-through only while the video really plays (otherwise the normal background stays)
-	f.videoOn = e.open && C.fs_video_open_now() != 0 && now.Sub(seen) < 2500*time.Millisecond
-}
-
-func (f *FullView) edgeStop() {
-	if f.edge.open {
-		C.fs_video_close()
-	}
-	f.edge = edgeVideo{}
-	f.videoOn = false
-}
-
-func (f *FullView) refocus() { C.fs_refocus() }
 
 /* ---------- the player's controls (Spotify / Apple Music by AppleScript) ---------- */
 

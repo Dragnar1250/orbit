@@ -727,3 +727,25 @@ void *og_cgimage_crop(OG *g, int *r) {
 	r[0] = x0; r[1] = y0; r[2] = w; r[3] = h;
 	return (void *)img;
 }
+
+/* ---------- added for 1.23: the transform saved and put back, lines into a path ---------- */
+
+void og_get_transform(OG *g, float *m) {
+	m[0] = g->T.a; m[1] = g->T.b; m[2] = g->T.c; m[3] = g->T.d; m[4] = g->T.tx; m[5] = g->T.ty;
+}
+
+void og_set_transform(OG *g, const float *m) {
+	g->T = CGAffineTransformMake(m[0], m[1], m[2], m[3], m[4], m[5]);
+	og_apply(g);
+}
+
+void og_path_lines(OPath *p, const float *xy, int n, int closed) {
+	if (n < 1) return;
+	CGPathMoveToPoint(p->p, NULL, xy[0], xy[1]);
+	for (int i = 1; i < n; i++) CGPathAddLineToPoint(p->p, NULL, xy[2 * i], xy[2 * i + 1]);
+	if (closed) CGPathCloseSubpath(p->p);
+}
+
+void og_path_close(OPath *p) {
+	if (!CGPathIsEmpty(p->p)) CGPathCloseSubpath(p->p);
+}

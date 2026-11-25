@@ -127,3 +127,86 @@ func armAngle(px, py, cx, cy, armLen, rt float64) float64 {
 	}
 	return a1
 }
+
+// paletteFromPixels picks up to n distinct, lively colours from a downscaled cover
+// (most saturated first; greys only when nothing else is there).
+func paletteFromPixels(px []uint32, n int) []uint32 {
+	type cand struct {
+		c          uint32
+		score      float64
+		hue        float64
+		grey       bool
+		brightness float64
+	}
+	var cs []cand
+	for _, c := range px {
+		r, g, b := float64(c>>16&255)/255, float64(c>>8&255)/255, float64(c&255)/255
+		mx, mn := math.Max(r, math.Max(g, b)), math.Min(r, math.Min(g, b))
+		if mx < 0.12 || c>>24 < 128 {
+			continue
+		}
+		sat := 0.0
+		if mx > 0 {
+			sat = (mx - mn) / mx
+		}
+		hue := 0.0
+		if d := mx - mn; d > 1e-6 {
+			switch mx {
+			case r:
+				hue = math.Mod((g-b)/d, 6)
+			case g:
+				hue = (b-r)/d + 2
+			default:
+				hue = (r-g)/d + 4
+			}
+			hue = math.Mod(hue/6+1, 1)
+		}
+		cs = append(cs, cand{c | 0xFF000000, sat*0.8 + mx*0.4, hue, sat < 0.15, mx})
+	}
+	for i := 1; i < len(cs); i++ { // most lively first (insertion sort: few pixels)
+		for j := i; j > 0 && cs[j].score > cs[j-1].score; j-- {
+			cs[j], cs[j-1] = cs[j-1], cs[j]
+		}
+	}
+	var out []uint32
+	var kept []cand
+	for _, c := range cs {
+		if len(out) >= n {
+			break
+		}
+		near := false
+		for _, k := range kept {
+			if k.grey != c.grey {
+				continue
+			}
+			d := math.Abs(k.hue - c.hue)
+			if (!c.grey && math.Min(d, 1-d) < 0.06) || (c.grey && math.Abs(k.brightness-c.brightness) < 0.15) {
+				near = true
+				break
+			}
+		}
+		if !near {
+			out = append(out, c.c)
+			kept = append(kept, c)
+		}
+	}
+	if len(out) == 0 {
+		out = []uint32{0xFFF2F2F2}
+	}
+	return out
+}
+
+// softTint: a colour from the album that reads well on dark glass — the hue kept, the
+// saturation calmed, the lightness lifted (like Apple's tinted labels). Greys stay neutral.
+func softTint(c uint32) uint32 {
+	r, g, b := float64(c>>16&255), float64(c>>8&255), float64(c&255)
+	h, s, l := rgbToHsl(r, g, b)
+	if s < 0.08 {
+		return 0xFFE6E6EB
+	}
+	s = math.Min(s, 0.72)
+	s = math.Max(s, 0.35)
+	l = math.Max(0.68, math.Min(0.8, l))
+	R, G, B := hslToRgb(h, s, l)
+	return 0xFF000000 | uint32(clamp255(R))<<16 | uint32(clamp255(G))<<8 | uint32(clamp255(B))
+}

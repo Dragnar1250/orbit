@@ -54,9 +54,8 @@ func TestSettingsChaos(t *testing.T) {
 			}
 			drainUI()
 			withCfg(func() {
-				_ = cfg.FsKind + cfg.SkinBg + cfg.SkinService + len(cfg.FsFont)
-				_ = skinBgNames[cfg.SkinBg] + serviceNames[cfg.SkinService] + fsKindNames[cfg.FsKind] + skinClockColorNames[cfg.SkinClockColor]
-				_ = styleNames[cfg.SkinLyricsStyle] + glowStyleNames[cfg.SkinFrameStyle] + fsBgNames[cfg.FsBg] + fsModeNames[cfg.FsMode]
+				_ = cfg.FsStage + len(cfg.FsFont)
+				_ = stageNames()[cfg.FsStage] + fsScreenNames[cfg.FsScreen] + themes[cfg.FsTheme].Name
 			})
 			time.Sleep(time.Millisecond)
 		}
@@ -148,25 +147,12 @@ func TestValidateRandomConfigs(t *testing.T) {
 			}
 		}
 		c.validateFields()
-		_ = skinBgNames[c.SkinBg] + serviceNames[c.SkinService] + fsKindNames[c.FsKind] + skinClockFontNames[c.SkinClockFont] + skinCentreNames[c.SkinCentre]
-		_ = styleNames[c.FsLyricsStyle] + styleNames[c.SkinLyricsStyle] + styleNames[c.LyricsStyle] + effectNames[c.FsEffect] + glowStyleNames[c.FsFrameStyle]
-		_ = fsBgNames[c.FsBg] + fsModeNames[c.FsMode] + fsInfoNames[c.FsInfo] + fsLyrPosNames[c.FsLyricsPos] + fsScreenNames[c.FsScreen]
-		_ = themes[c.FsTheme].Name + themes[c.Theme].Name + visPalettes[c.FsPalette].Name
-		if c.FsFPS != 30 && c.FsFPS != 60 || c.SkinGlass < 0.2 || c.SkinGlass > 1 || c.SkinDim < 0 || c.SkinDim > 0.85 {
-			t.Fatalf("out of range: fps %d glass %v dim %v", c.FsFPS, c.SkinGlass, c.SkinDim)
+		_ = stageNames()[c.FsStage] + styleNames[c.LyricsStyle] + effectNames[c.FsEffect] + fsScreenNames[c.FsScreen]
+		_ = themes[c.FsTheme].Name + themes[c.Theme].Name + uiThemeNames[c.UITheme]
+		if c.FsFPS != 30 && c.FsFPS != 60 || c.FsTextSize < 20 || c.FsTextSize > 200 {
+			t.Fatalf("out of range: fps %d size %d", c.FsFPS, c.FsTextSize)
 		}
 	}
-}
-
-func FuzzSearchURL(f *testing.F) {
-	f.Add(1, "Juice WRLD Lucid Dreams")
-	f.Add(0, "a&b?c#d/e")
-	f.Fuzz(func(t *testing.T, s int, q string) {
-		u := searchURL(s, q)
-		if strings.ContainsAny(u, " \"<>#\n\r\t") || len(u) > 2000 {
-			t.Fatalf("bad link %q", u)
-		}
-	})
 }
 
 func FuzzParseLRC(f *testing.F) {
@@ -249,7 +235,6 @@ func TestLayoutChaos(t *testing.T) {
 				t.Fatal("wordDur", d)
 			}
 		}
-		_ = editText(strings.Repeat("ş", r.Intn(4)), rune(r.Intn(200)), 3)
-		_, _, _ = coverFlow(r.Intn(15) - 7)
+		_ = cinemaLayout(float64(r.Intn(4000)+1), float64(r.Intn(3000)+1), r.Intn(2) == 0, r.Intn(2) == 0)
 	}
 }

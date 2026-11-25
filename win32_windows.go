@@ -65,6 +65,7 @@ var (
 
 	pGetModuleHandleW           = kernel32.NewProc("GetModuleHandleW")
 	pCreateMutexW               = kernel32.NewProc("CreateMutexW")
+	pGetCurrentThreadId         = kernel32.NewProc("GetCurrentThreadId")
 	pGetLastError               = kernel32.NewProc("GetLastError")
 	pOpenProcess                = kernel32.NewProc("OpenProcess")
 	pCloseHandle                = kernel32.NewProc("CloseHandle")
@@ -308,7 +309,7 @@ func utf16PtrToString(p uintptr, n int) string {
 }
 
 func messageBox(text, title string) {
-	call(pMessageBoxW, 0, uintptr(unsafe.Pointer(u16(text))), uintptr(unsafe.Pointer(u16(title))), 0x40)
+	call(pMessageBoxW, 0, uintptr(unsafe.Pointer(u16(T(text)))), uintptr(unsafe.Pointer(u16(title))), 0x40)
 }
 
 /* ---------- Registry: start with Windows ---------- */
@@ -376,3 +377,28 @@ func trimWorkingSet() {
 }
 
 var gwlExStyle = func() uintptr { v := int32(GWL_EXSTYLE); return uintptr(v) }()
+
+func init() {
+	systemLang = func() string {
+		id, _, _ := kernel32.NewProc("GetUserDefaultUILanguage").Call()
+		switch id & 0x3ff {
+		case 0x1f:
+			return "tr"
+		case 0x19:
+			return "ru"
+		}
+		return "en"
+	}
+}
+
+// setPriority: on the desktop Orbit is decoration — it runs below normal priority, so a
+// busy moment of its own never takes time from the mouse, games or other apps. Full screen
+// is what you are watching: normal priority.
+func setPriority(fullScreen bool) {
+	cls := uintptr(0x4000) // BELOW_NORMAL_PRIORITY_CLASS
+	if fullScreen {
+		cls = 0x20 // NORMAL_PRIORITY_CLASS
+	}
+	cur, _, _ := kernel32.NewProc("GetCurrentProcess").Call()
+	kernel32.NewProc("SetPriorityClass").Call(cur, cls)
+}

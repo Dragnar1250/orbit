@@ -435,7 +435,7 @@ func TestBallHop(t *testing.T) {
 	if _, y := ballHop(0, 0, 10, 0, 7, 50); y != 0 {
 		t.Fatal("clamped")
 	}
-	if styleNames[stConstellation] != "Constellation" || styleNames[stBouncing] != "Bouncing" || len(styleNames) != 29 {
+	if styleNames[stConstellation] != "Constellation" || styleNames[stBouncing] != "Bouncing" || len(styleNames) != 31 {
 		t.Fatal("style names")
 	}
 }
@@ -545,19 +545,17 @@ func TestHiResCover(t *testing.T) {
 		t.Fatal("normal:", b)
 	}
 	c := defaultConfig()
-	if c.FsMode != fsmArt || c.FsBg != fsbBlackHole || !c.FsLyrics || c.FsFPS != 30 || c.FsLyricsStyle != stGlass {
+	if !c.FsLyrics || c.FsFPS != 60 || c.FsStage != 1+stScatter {
 		t.Fatal("full screen defaults")
 	}
-	for k, v := range map[string]string{"FsMode": "9", "FsBg": "9", "FsVis": "99", "FsFPS": "45", "FsTextSize": "999", "FsFont": `""`, "FsLyricsStyle": "999",
-		"FsFrameBright": "5", "FsTextColor": `"x"`, "FsLyricsWidth": "5"} {
+	for k, v := range map[string]string{"FsFPS": "45", "FsTextSize": "999", "FsFont": `""`, "FsStage": "999", "FsTextColor": `"x"`} {
 		c.setField(k, json.RawMessage(v))
 	}
-	if c.FsMode != 3 || c.FsBg != len(fsBgNames)-1 || c.FsVis != len(visNames) || c.FsFPS != 30 || c.FsTextSize != 200 || c.FsFont != "Segoe UI" ||
-		c.FsLyricsStyle != len(styleNames)-1 || c.FsFrameBright != 1 || c.FsTextColor != "#FFFFFF" || c.FsLyricsWidth != 30 {
+	if c.FsFPS != 60 || c.FsTextSize != 200 || c.FsFont != "Segoe UI" || c.FsStage != len(styleNames) || c.FsTextColor != "#FFFFFF" {
 		t.Fatalf("clamps %+v", c)
 	}
-	c.setField("FsFPS", json.RawMessage("60"))
-	if c.FsFPS != 60 {
-		t.Fatal("60 fps allowed")
+	c.setField("FsFPS", json.RawMessage("30"))
+	if c.FsFPS != 30 {
+		t.Fatal("30 fps allowed")
 	}
 }

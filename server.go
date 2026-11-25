@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -46,11 +47,11 @@ type Hooks struct {
 	FormatDate func(t time.Time, long bool) string
 	// Fullscreen opens (true) or closes (false) the full-screen view
 	Fullscreen func(open bool)
+	// OpenSettings: the settings in Orbit's own window (the Mac)
+	OpenSettings func()
 	// UpdateInstall: put the downloaded update in place and restart; UpdateReady: one is ready
 	UpdateInstall func()
 	UpdateReady   func()
-	// OpenSettings: show the settings window (the Mac's own window; tests use it)
-	OpenSettings func()
 }
 
 type WidgetInfo struct {
@@ -105,9 +106,32 @@ func drainUI() {
 }
 
 func withCfg(f func()) {
+	if threadID != nil && cfgOwner.Load() != 0 && cfgOwner.Load() == threadID() {
+		f() // the UI thread already holds it (Cinema drawing with its own settings): no deadlock
+		return
+	}
 	cfgMu.Lock()
 	defer cfgMu.Unlock()
 	f()
+}
+
+// The thread that holds cfgMu while drawing with borrowed settings (Cinema's lyrics and record),
+// so that anything they call that asks for the settings doesn't wait for itself forever.
+var (
+	cfgOwner atomic.Uint64
+	threadID func() uint64 // set on Windows
+)
+
+func lockCfgUI() {
+	cfgMu.Lock()
+	if threadID != nil {
+		cfgOwner.Store(threadID())
+	}
+}
+
+func unlockCfgUI() {
+	cfgOwner.Store(0)
+	cfgMu.Unlock()
 }
 
 type SettingsServer struct {
@@ -176,7 +200,6 @@ type stateResp struct {
 	Skies    []constellation       `json:"skies"` // the real constellations (Constellation style previews)
 	Spotify  map[string]any        `json:"spotify"`
 	Update   map[string]any        `json:"update"`
-	Platform string                `json:"platform"` // "windows", "darwin": the page shows what this Orbit has
 	Now      map[string]any        `json:"now"`
 	EditMode bool                  `json:"editMode"`
 	Startup  bool                  `json:"startup"`
@@ -240,10 +263,13 @@ func (s *SettingsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write(settingsHTML)
 	case r.URL.Path == "/spotify/login" && r.Method == "GET":
 		serveSpotify(w, r, s.port)
-	case r.URL.Path == "/video" && r.Method == "GET", r.URL.Path == "/api/video":
-		serveVideo(w, r)
 	case r.URL.Path == "/api/state" && r.Method == "GET":
 		s.state(w)
+	case r.URL.Path == "/api/i18n" && r.Method == "GET":
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		fmt.Fprintf(w, `{"lang":%q,"platform":%q,"dict":`, langCode(), runtime.GOOS)
+		w.Write(langJSON())
+		w.Write([]byte("}"))
 	case r.URL.Path == "/api/set" && r.Method == "POST":
 		s.set(w, r)
 	case r.URL.Path == "/api/geocode" && r.Method == "GET":
@@ -257,7 +283,7 @@ func (s *SettingsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			logf("geocode %q: %v", q, err)
 			w.WriteHeader(502)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Can't reach the place search right now"})
+			json.NewEncoder(w).Encode(map[string]string{"error": T("Can't reach the place search right now")})
 			return
 		}
 		out := make([]map[string]any, len(places))
@@ -316,17 +342,14 @@ func (s *SettingsServer) state(w http.ResponseWriter) {
 	resp := stateResp{Vis: visNames, Palettes: pal, Cards: visCardNames, Motions: motionNames, Cases: caseNames, Config: cb, Fonts: hooks.Fonts(), Now: now, EditMode: hooks.EditMode(), Startup: hooks.StartupEnabled(),
 		Styles: styleNames, Effects: effectNames, Themes: th, Corners: cornerNames, Discs: discNames, DiscCols: discColorNames, Version: appVersion, Widgets: hooks.WidgetInfo(),
 		All: allWidgets, Weather: weatherSnapshot(), Now2: fmtDate(time.Now(), true), Now3: fmtDate(time.Now(), false),
-		Skies:    constellations,
-		Spotify:  map[string]any{"connected": spConnected, "control": spControl, "error": spErr, "redirect": spotifyRedirect(s.port)},
-		Update:   updater.status(),
-		Platform: runtime.GOOS,
+		Skies:   constellations,
+		Spotify: map[string]any{"connected": spConnected, "control": spControl, "error": spErr, "redirect": spotifyRedirect(s.port)},
+		Update:  updater.status(),
 		Lists: map[string][]string{"clockStyles": clockStyleNames, "fontGroups": fontGroupNames, "clockColors": clockColorNames, "aligns": alignNames,
 			"weatherStyles": weatherStyleNames, "glowStyles": glowStyleNames, "glowWhere": glowWhereNames, "glowModes": glowModeNames,
 			"glowColors": glowColorNames, "glowScreens": glowScreenNames, "weatherKinds": weatherKindNames, "starShapes": starShapeNames,
 			"vinylLayouts": vinylLayoutNames, "ambColors": ambColorNames, "ambEffects": ambEffectNames,
-			"fsModes": fsModeNames, "fsBgs": fsBgNames, "fsInfos": fsInfoNames, "fsLyrPos": fsLyrPosNames, "fsScreens": fsScreenNames,
-			"fsKinds": fsKindNames, "skinBgs": skinBgNames, "skinClockFonts": skinClockFontNames, "skinClockColors": skinClockColorNames,
-			"skinCentres": skinCentreNames, "services": serviceNames, "uiThemes": uiThemeNames}}
+			"fsScreens": fsScreenNames, "stages": stageNames(), "uiThemes": uiThemeNames, "fsBgs": fsBgNames, "fsCovers": fsCoverNames, "fsArms": fsArmNames, "langs": langNames}}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
@@ -374,10 +397,6 @@ func (s *SettingsServer) action(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal(req.Value, &b)
 	_ = json.Unmarshal(req.Value, &str)
 	switch req.Name {
-	case "openSettings":
-		if hooks.OpenSettings != nil {
-			runOnUI(hooks.OpenSettings)
-		}
 	case "updateCheck":
 		updater.check(true, func() {
 			if hooks.UpdateReady != nil {
@@ -479,6 +498,10 @@ func (s *SettingsServer) action(w http.ResponseWriter, r *http.Request) {
 		runOnUI(func() { hooks.SetStartup(b) })
 	case "openFolder":
 		runOnUI(hooks.OpenFolder)
+	case "openSettings":
+		if hooks.OpenSettings != nil {
+			hooks.OpenSettings()
+		}
 	case "quit":
 		runOnUI(hooks.Quit)
 	default:
