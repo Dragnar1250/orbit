@@ -19,6 +19,20 @@ Engine, Lively or a normal picture) and shows:
 Works with Spotify and anything in the Windows media controls. Lyrics: lrclib.net
 
 
+NEW IN 1.23.5  -  THE SHARP FULL-SCREEN BACKGROUND, NOW ALSO ON WINDOWS
+-----------------------------------------------------------------------
+  - The real reason the "Cover" background stayed blurry on Windows: the
+    big cover was compared with Spotify's small one at 8x8 pixels, drawn
+    so roughly (a few single pixels, not an average) that a detailed cover
+    - clouds, grain - never looked "the same", and the sharp copy was
+    thrown away every time. The covers are now compared properly (averaged
+    from 64x64), so the 2000 px cover is used, as on the Mac. Covers that
+    were wrongly given up on are looked up again.
+  - Lyrics "Shadow" and "Outline" are clearly visible now: a soft drop
+    shadow, and an outline in the accent colour (black alone disappeared
+    on dark screens).
+  - Closing full screen writes how smooth it was to orbit.log.
+
 NEW IN 1.23.3  -  A SHARP COVER BEHIND FULL SCREEN, FOR EVERY SONG
 -----------------------------------------------------------------
   - Spotify only gives Orbit a small cover (300 px). Spread across a big

@@ -133,6 +133,9 @@ func closeFullscreen() {
 		return
 	}
 	fs = nil
+	// how smooth it was (for a report: Orbit's folder → orbit.log)
+	logf("full screen closed: %dx%d, %.1f ms a frame, %.0f Hz screen, %d fps asked — %s — %s", f.winW, f.winH, f.cin.frameMs,
+		1e9/math.Max(1, float64(refreshNs.Load())), cfg.FsFPS, frameStats(), profLine())
 	vsyncStop()
 	setPriority(false)
 	if f.hwnd != 0 {

@@ -41,7 +41,7 @@ func sigFromImage(im image.Image) *coverSig {
 	}
 	s := min(w, h)
 	x0, y0 := r.Min.X+(w-s)/2, r.Min.Y+(h-s)/2
-	step := max(1, s/64) // about 64 samples a side are plenty for an average
+	step := max(1, s/256) // 256 samples a side: a true average, not a few picked pixels
 	var sig coverSig
 	var cnt [64]float64
 	for y := 0; y < s; y += step {

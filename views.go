@@ -4142,14 +4142,20 @@ func drawEffect(g, path uintptr, col uint32, size float32, effect int) {
 			strokePath(g, path, withAlpha(col|0xFF000000, a*[]float64{0.07, 0.12, 0.2, 0.35}[i]*math.Min(1.5, float64(amt))), size*0.5*amt*wm+1)
 		}
 		fillPathColor(g, path, col)
-	case fxShadow:
-		dx, dy := size*0.05*amt+1, size*0.07*amt+1
+	case fxShadow: // a soft drop shadow, big enough to see (it was a 2 px black copy: lost on any dark screen)
+		dx, dy := size*0.07*amt+2, size*0.10*amt+2
 		gTranslate(g, dx, dy)
-		fillPathColor(g, path, withAlpha(0xFF000000, a*0.7))
+		for i, wm := range []float32{1.0, 0.6, 0.3} { // soft edge
+			strokePath(g, path, withAlpha(0xFF000000, a*[]float64{0.18, 0.25, 0.35}[i]), size*0.16*amt*wm+1)
+		}
+		fillPathColor(g, path, withAlpha(0xFF000000, a*0.85))
 		gTranslate(g, -dx, -dy)
+		strokePath(g, path, withAlpha(0xFF000000, a*0.35), size*0.03+1) // a thin dark edge: the letters stand off
 		fillPathColor(g, path, col)
-	case fxOutline:
-		strokePath(g, path, withAlpha(0xFF000000, a*0.9), size*0.09*amt+1.5)
+	case fxOutline: // a clear outline in the accent colour (black alone vanished on dark screens), dark inside it
+		w := size*0.10*amt + 2
+		strokePath(g, path, withAlpha(accent()|0xFF000000, a), w)
+		strokePath(g, path, withAlpha(0xFF000000, a*0.85), w*0.45)
 		fillPathColor(g, path, col)
 	case fxNeon:
 		acc := accent()

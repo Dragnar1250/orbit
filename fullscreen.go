@@ -167,7 +167,7 @@ func (f *FullView) useHiRes(key string, b []byte) {
 
 func hiResPath(key string) string {
 	h := sha1.Sum([]byte(key))
-	return filepath.Join(appDir(), "cache", "cover2k-"+hex.EncodeToString(h[:8])+".jpg")
+	return filepath.Join(appDir(), "cache", "bigcover-"+hex.EncodeToString(h[:8])+".jpg")
 }
 
 // fetchHiResCached downloads the big cover once and keeps it (an empty file = none found).
@@ -199,8 +199,10 @@ func pruneHiRes(n int) {
 		_ = os.Remove(p)
 	}
 	pruneGlob("sq-*.jpg", 200) // Spotify queue pictures
-	pruneGlob("cover2k-*.jpg", n)
+	pruneGlob("bigcover-*.jpg", n)
 	old, _ = filepath.Glob(filepath.Join(appDir(), "cache", "hires2k-*.jpg")) // 1.14–1.23's (iTunes only)
+	old2, _ := filepath.Glob(filepath.Join(appDir(), "cache", "cover2k-*.jpg")) // 1.23.3's (bad Windows match)
+	old = append(old, old2...)
 	for _, p := range old {
 		_ = os.Remove(p)
 	}
@@ -254,40 +256,16 @@ func coverRef(key string) *coverSig {
 	if cover.key != key || cover.img == 0 {
 		return nil
 	}
-	A := newBitmap(8, 8)
-	if A == nil {
-		return nil
-	}
-	defer A.Free()
-	drawCoverSquare(A.g, cover.img, 0, 0, 8)
-	var sig coverSig
-	for i := range sig {
-		c := pixel(A.bmp, i%8, i/8)
-		sig[i] = [3]float64{float64(c >> 16 & 255), float64(c >> 8 & 255), float64(c & 255)}
-	}
-	return &sig
+	return sigFromHandle(cover.img)
 }
 
 // imageDiff: 0 = the same picture, 1 = opposite (compared at 8×8).
 func imageDiff(a, b uintptr) float64 {
-	A, B := newBitmap(8, 8), newBitmap(8, 8)
-	defer A.Free()
-	defer B.Free()
+	A, B := sigFromHandle(a), sigFromHandle(b)
 	if A == nil || B == nil {
 		return 0
 	}
-	drawCoverSquare(A.g, a, 0, 0, 8)
-	drawCoverSquare(B.g, b, 0, 0, 8)
-	var d float64
-	for y := 0; y < 8; y++ {
-		for x := 0; x < 8; x++ {
-			p, q := pixel(A.bmp, x, y), pixel(B.bmp, x, y)
-			for s := 0; s < 24; s += 8 {
-				d += math.Abs(float64(p>>s&255) - float64(q>>s&255))
-			}
-		}
-	}
-	return d / (64 * 3 * 255)
+	return sigDiff(A, B)
 }
 
 func fmtTime(s float64) string {
