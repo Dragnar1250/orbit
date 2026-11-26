@@ -85,11 +85,18 @@ shotc() { # name h w
 }
 set_opt LyricsPlace 1
 curl -sf -X POST "$BASE/api/action?t=$TOK" -H 'Content-Type: application/json' -d '{"name":"widget","value":{"name":"lyrics","x":50,"y":50,"scale":1}}' >/dev/null
+set_opt LyricsStyle 0
 set_opt Motion 0; sleep 3; shotc 07c-softglow-still 360 1100
 set_opt Motion 3; sleep 2; shotc 07d-softglow-beat-a 360 1100; sleep 0.37; shotc 07e-softglow-beat-b 360 1100
+set_opt GlowAmount 1.65; set_opt Effect 2; set_opt Motion 0; sleep 2; shotc 07f-strong165-still 360 1100
+set_opt Motion 3; sleep 2; shotc 07g-strong165-beat 360 1100
+set_opt Effect 1; sleep 2; shotc 07h-soft165-beat 360 1100
+set_opt GlowAmount 1; set_opt Effect 1
 set_opt Motion 1; set_opt LyricsPlace 0
 # full screen (Cinema) while a song plays: covers, backgrounds, stages, a language
 act fullscreen true; sleep 5; alive "Cinema"; shot 08-cinema
+set_opt FsEffect 2; sleep 3; shotc 08b-cinema-strong 900 1600
+set_opt FsEffect 1; sleep 3; shotc 08c-cinema-soft 900 1600
 for c in 0 2; do for b in 0 1 2 3 4; do set_opt FsCover $c; set_opt FsBg $b; sleep 0.8; alive "Cinema cover $c background $b"; done; done
 shot 09-cinema-record
 for st in 0 1 12 28 30 31; do set_opt FsStage $st; sleep 0.8; alive "Cinema stage $st"; done
