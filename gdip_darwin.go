@@ -518,6 +518,7 @@ type glowSpriteKey struct {
 	path uintptr
 	rgb  uint32
 	r2   int32 // the blur radius in half pixels
+	sc   int32 // the canvas's scale ×100
 }
 
 type glowSpriteEntry struct {
@@ -539,48 +540,53 @@ func flushGlowSprites() {
 }
 
 // glowSprite lays the glow of path (colour c, blur r) at alpha; false when it can't be kept
-// (not a cached text path, or too big) — then the caller blurs it directly.
+// (not a cached text path, too big, or turned / stretched) — then the caller blurs it directly.
+// The sprite is made at the canvas's own pixel scale (2 on Retina) and laid down in Go, straight
+// into the widget's pixels (Core Graphics made a new image of it on every draw: slower than the
+// blur it saved).
 func glowSprite(g, path uintptr, c uint32, r float32, alpha float64) bool {
 	if !textPathSet[path] || r <= 0 {
 		return false
 	}
-	k := glowSpriteKey{path, c & 0xFFFFFF, int32(math.Round(float64(r) * 2))}
+	w := canvasOwner[g]
+	if w == nil || w.canvas == nil {
+		return false
+	}
+	m := getTransform(g)
+	sc := m[0]
+	if sc <= 0 || math.Abs(float64(m[3]-sc)) > 0.002 || m[1] != 0 || m[2] != 0 {
+		return false
+	}
+	dst := pix(w.canvas)
+	if dst == nil {
+		return false
+	}
+	k := glowSpriteKey{path, c & 0xFFFFFF, int32(math.Round(float64(r) * 2)), int32(math.Round(float64(sc) * 100))}
 	e := glowSprites[k]
 	if e == nil {
 		b := pathBounds(path)
-		m := float32(math.Ceil(float64(r)*2.2)) + 2
-		w, h := int(math.Ceil(float64(b.W+2*m))), int(math.Ceil(float64(b.H+2*m)))
-		if w <= 0 || h <= 0 || w*h > 1500*400 {
+		mg := float32(math.Ceil(float64(r)*2.2)) + 2 // in the path's units
+		bw, bh := int(math.Ceil(float64((b.W+2*mg)*sc))), int(math.Ceil(float64((b.H+2*mg)*sc)))
+		if bw <= 0 || bh <= 0 || bw*bh > 2400*600 {
 			return false
 		}
-		if glowSpriteBytes+w*h*4 > 24<<20 {
+		if glowSpriteBytes+bw*bh*4 > 24<<20 {
 			flushGlowSprites()
 		}
-		bm := newBitmap(w, h)
+		bm := newBitmap(bw, bh)
 		if bm == nil {
 			return false
 		}
-		gTranslate(bm.g, m-b.X, m-b.Y)
-		C.og_shadow_only(og(bm.g), opath(path), C.uint32_t(c), C.float(r))
+		setTransform(bm.g, [6]float32{sc, 0, 0, sc, (mg - b.X) * sc, (mg - b.Y) * sc})
+		C.og_shadow_only(og(bm.g), opath(path), C.uint32_t(c), C.float(r)) // (a shadow's blur is in pixels, as with fillPathGlow)
 		gReset(bm.g)
-		e = &glowSpriteEntry{bm, b.X - m, b.Y - m}
+		e = &glowSpriteEntry{bm, b.X - mg, b.Y - mg}
 		glowSprites[k] = e
-		glowSpriteBytes += w * h * 4
+		glowSpriteBytes += bw * bh * 4
 	}
-	// laid down in Go, straight into the widget's pixels, when nothing but a move is in the way
-	// (Core Graphics made a new image of the sprite for every draw: slower than the blur it saved)
-	if w := canvasOwner[g]; w != nil && w.canvas != nil {
-		m := getTransform(g)
-		if math.Abs(float64(m[0]-1)) < 0.002 && math.Abs(float64(m[3]-1)) < 0.002 && m[1] == 0 && m[2] == 0 {
-			if dst := pix(w.canvas); dst != nil {
-				dx := int(math.Round(float64(e.x + m[4])))
-				dy := int(math.Round(float64(e.y + m[5])))
-				cw, ch := w.canvas.w, w.canvas.h
-				overBlitScaled(dst, cw, ch, e.b.pixels(), e.b.w, e.b.h, dx, dy, 1, 1, [4]int{0, 0, cw, ch}, int(math.Round(math.Min(1, alpha)*255)))
-				return true
-			}
-		}
-	}
-	gImageAlpha(g, e.b.bmp, e.b.w, e.b.h, e.x, e.y, float32(e.b.w), float32(e.b.h), alpha)
+	dx := int(math.Round(float64(sc*e.x + m[4])))
+	dy := int(math.Round(float64(sc*e.y + m[5])))
+	cw, ch := w.canvas.w, w.canvas.h
+	overBlitScaled(dst, cw, ch, e.b.pixels(), e.b.w, e.b.h, dx, dy, 1, 1, [4]int{0, 0, cw, ch}, int(math.Round(math.Min(1, alpha)*255)))
 	return true
 }
