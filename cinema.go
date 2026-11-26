@@ -360,7 +360,7 @@ func blendWhite(dst []uint32, dw, dh int, src []uint32, sw, sh, dx, dy, sx0, sy0
 			}
 		}
 	}
-	if (x1-x0)*(y1-y0) < 1<<15 {
+	if (x1-x0)*(y1-y0) < 1<<17 {
 		job(y0, y1)
 		return
 	}
@@ -529,7 +529,7 @@ func addBloom(dst []uint32, dw, dh int, glow []uint16, gw, gh, k, dx, dy int, cl
 			}
 		}
 	}
-	if (x1-x0)*(y1-y0) < 1<<15 {
+	if (x1-x0)*(y1-y0) < 1<<17 {
 		job(y0, y1)
 		return
 	}
@@ -733,7 +733,7 @@ func overBlitFeather(dst []uint32, dw, dh int, src []uint32, sw, sh, dx, dy int,
 		sx := x - dx
 		kx[x-x0] = ramp(min(sx, sw-1-sx))
 	}
-	parallelRows(y1-y0, func(ya, yb int) {
+	parallelArea((x1-x0)*(y1-y0), y1-y0, func(ya, yb int) {
 		for y := y0 + ya; y < y0+yb; y++ {
 			sy := y - dy
 			ky := ramp(min(sy, sh-1-sy))
@@ -926,7 +926,7 @@ func ringsOver(dst []uint32, dw, dh int, cx, cy float64, rings []ring, col uint3
 	}
 	cr, cg, cb := col>>16&255, col>>8&255, col&255
 	in2, out2 := r0*r0, r1*r1
-	parallelRows(y1-y0, func(a, b int) {
+	parallelArea((x1-x0)*(y1-y0), y1-y0, func(a, b int) {
 		for y := y0 + a; y < y0+b; y++ {
 			dy := float64(y) + 0.5 - cy
 			dy2 := dy * dy
@@ -1108,7 +1108,7 @@ func overBlitScaled(dst []uint32, dw, dh int, src []uint32, sw, sh, dx, dy int, 
 	}
 	ka := uint32(min(alpha, 255))
 	isx, isy := 1/sx, 1/sy
-	parallelRows(y1-y0, func(a, b int) {
+	parallelArea((x1-x0)*(y1-y0), y1-y0, func(a, b int) {
 		for y := y0 + a; y < y0+b; y++ {
 			fy := (float64(y)+0.5-cy)*isy + float64(sh)/2 - 0.5
 			if fy < -1 || fy > float64(sh) {

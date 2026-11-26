@@ -63,7 +63,7 @@ func warpOnto(dst []uint32, dw, dh int, src []uint32, sw, sh int, q [4][2]float6
 	}
 	op := uint32(math.Round(math.Min(1, opacity) * 256))
 	fw, fh := float64(sw), float64(sh)
-	parallelRows(y1-y0, func(a, b int) {
+	parallelArea((x1-x0)*(y1-y0), y1-y0, func(a, b int) {
 		for y := y0 + a; y < y0+b; y++ {
 			row := dst[y*dw : y*dw+dw]
 			for x := x0; x < x1; x++ {

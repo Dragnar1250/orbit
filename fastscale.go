@@ -92,6 +92,17 @@ var scaleWorkers = func() int {
 }()
 
 // parallelRows runs job over [0,h) in a few bands at once.
+// parallelArea: parallelRows for work over an area of about area pixels — below ~130 000 pixels
+// it runs right here: waking up worker threads for a small blit cost more than the blit
+// (on the Mac a quarter of all of Orbit's time was spent just waking threads).
+func parallelArea(area, h int, job func(y0, y1 int)) {
+	if area < 1<<17 {
+		job(0, h)
+		return
+	}
+	parallelRows(h, job)
+}
+
 func parallelRows(h int, job func(y0, y1 int)) {
 	n := scaleWorkers
 	if h < 64 || n == 1 {
