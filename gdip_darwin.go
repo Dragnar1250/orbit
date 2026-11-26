@@ -567,6 +567,20 @@ func glowSprite(g, path uintptr, c uint32, r float32, alpha float64) bool {
 		glowSprites[k] = e
 		glowSpriteBytes += w * h * 4
 	}
+	// laid down in Go, straight into the widget's pixels, when nothing but a move is in the way
+	// (Core Graphics made a new image of the sprite for every draw: slower than the blur it saved)
+	if w := canvasOwner[g]; w != nil && w.canvas != nil {
+		m := getTransform(g)
+		if math.Abs(float64(m[0]-1)) < 0.002 && math.Abs(float64(m[3]-1)) < 0.002 && m[1] == 0 && m[2] == 0 {
+			if dst := pix(w.canvas); dst != nil {
+				dx := int(math.Round(float64(e.x + m[4])))
+				dy := int(math.Round(float64(e.y + m[5])))
+				cw, ch := w.canvas.w, w.canvas.h
+				overBlitScaled(dst, cw, ch, e.b.pixels(), e.b.w, e.b.h, dx, dy, 1, 1, [4]int{0, 0, cw, ch}, int(math.Round(math.Min(1, alpha)*255)))
+				return true
+			}
+		}
+	}
 	gImageAlpha(g, e.b.bmp, e.b.w, e.b.h, e.x, e.y, float32(e.b.w), float32(e.b.h), alpha)
 	return true
 }
