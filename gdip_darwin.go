@@ -390,13 +390,10 @@ func drawGlowPath(g, path uintptr, fill uint32, glow uint32, glowAmt float32, sh
 		fillPathColor(g, path, argb(uint8(float64(fill>>24)*0.45), 0, 0, 0))
 		gTranslate(g, 0, -2)
 	}
-	if glowAmt > 0 {
-		for i, wmul := range []float32{1.0, 0.6, 0.3} {
-			a := float64(glow>>24) / 255 * []float64{0.10, 0.16, 0.24}[i]
-			p := newPen(withAlpha(glow|0xFF000000, a), glowAmt*wmul)
-			drawPathPen(g, p, path)
-			freePen(p)
-		}
+	if glowAmt > 0 { // a soft halo hugging the letters: Core Graphics' blurred shadow
+		a := float64(glow>>24) / 255
+		fillPathGlow(g, path, fill, withAlpha(glow|0xFF000000, a*0.6), float32(math.Min(18, float64(glowAmt)*0.8+1)))
+		return
 	}
 	fillPathColor(g, path, fill)
 }
@@ -495,14 +492,11 @@ const (
 // strongGlowSoft: Strong glow on the Mac — one wide outline and the letters themselves laid on the
 // soft layer and blurred: a smooth halo. (Four outlines one on another showed as hard grey rings.)
 func strongGlowSoft(g, path uintptr, col uint32, size, amt float32, a float64) bool {
-	if !softBegin(g) {
-		return false
-	}
-	w := size*0.36*amt + 1
-	strokePath(g, path, withAlpha(col|0xFF000000, a*0.42*math.Min(1.2, float64(amt))), w)
-	fillPathColor(g, path, withAlpha(col|0xFF000000, a*0.6))
-	softEnd(g)
-	softBlur(g, float32(math.Max(2, float64(w)*0.42)))
-	fillPathColor(g, path, col)
+	// Core Graphics' own blurred shadow, in the letters' colour: a smooth halo (four outlines one
+	// on another showed as hard grey rings). A wide faint one, then a close brighter one.
+	wide := float32(math.Min(28, float64(size*0.5*amt)+2))
+	near := float32(math.Min(12, float64(size*0.18*amt)+1.5))
+	fillPathGlow(g, path, col, withAlpha(col|0xFF000000, a*0.55*math.Min(1.2, float64(amt))), wide)
+	fillPathGlow(g, path, col, withAlpha(col|0xFF000000, a*0.75), near)
 	return true
 }
