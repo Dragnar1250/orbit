@@ -392,7 +392,12 @@ func drawGlowPath(g, path uintptr, fill uint32, glow uint32, glowAmt float32, sh
 	}
 	if glowAmt > 0 { // a soft halo hugging the letters: Core Graphics' blurred shadow
 		a := float64(glow>>24) / 255
-		fillPathGlow(g, path, fill, withAlpha(glow|0xFF000000, a*0.6), float32(math.Min(14, float64(glowAmt)*0.8+1)))
+		r := float32(math.Min(14, float64(glowAmt)*0.8+1))
+		if !glowSprite(g, path, glow, r, a*0.6) {
+			fillPathGlow(g, path, fill, withAlpha(glow|0xFF000000, a*0.6), r)
+			return
+		}
+		fillPathColor(g, path, fill)
 		return
 	}
 	fillPathColor(g, path, fill)
@@ -496,7 +501,72 @@ func strongGlowSoft(g, path uintptr, col uint32, size, amt float32, a float64) b
 	// on another showed as hard grey rings). A wide faint one, then a close brighter one.
 	wide := float32(math.Min(22, float64(size*0.5*amt)+2)) // (the blur's cost grows with its radius)
 	near := float32(math.Min(12, float64(size*0.18*amt)+1.5))
+	if glowSprite(g, path, col, wide, a*0.55*math.Min(1.2, float64(amt))) && glowSprite(g, path, col, near, a*0.75) {
+		fillPathColor(g, path, col)
+		return true
+	}
 	fillPathGlow(g, path, col, withAlpha(col|0xFF000000, a*0.55*math.Min(1.2, float64(amt))), wide)
 	fillPathGlow(g, path, col, withAlpha(col|0xFF000000, a*0.75), near)
+	return true
+}
+
+// Glow sprites: the blur of a line's glow is made once — a picture of only the glow, kept with
+// the line's text path — and then only laid down each frame at the strength wanted (the beat's
+// Glow changes that every frame). Blurring every line every frame was a third of the widgets'
+// time on the Mac. Kept for the text paths in the cache, at most ~24 MB.
+type glowSpriteKey struct {
+	path uintptr
+	rgb  uint32
+	r2   int32 // the blur radius in half pixels
+}
+
+type glowSpriteEntry struct {
+	b    *Bitmap
+	x, y float32 // where its top-left goes, in the path's space
+}
+
+var (
+	glowSprites     = map[glowSpriteKey]*glowSpriteEntry{}
+	glowSpriteBytes int
+)
+
+func flushGlowSprites() {
+	for _, e := range glowSprites {
+		e.b.Free()
+	}
+	glowSprites = map[glowSpriteKey]*glowSpriteEntry{}
+	glowSpriteBytes = 0
+}
+
+// glowSprite lays the glow of path (colour c, blur r) at alpha; false when it can't be kept
+// (not a cached text path, or too big) — then the caller blurs it directly.
+func glowSprite(g, path uintptr, c uint32, r float32, alpha float64) bool {
+	if !textPathSet[path] || r <= 0 {
+		return false
+	}
+	k := glowSpriteKey{path, c & 0xFFFFFF, int32(math.Round(float64(r) * 2))}
+	e := glowSprites[k]
+	if e == nil {
+		b := pathBounds(path)
+		m := float32(math.Ceil(float64(r)*2.2)) + 2
+		w, h := int(math.Ceil(float64(b.W+2*m))), int(math.Ceil(float64(b.H+2*m)))
+		if w <= 0 || h <= 0 || w*h > 1500*400 {
+			return false
+		}
+		if glowSpriteBytes+w*h*4 > 24<<20 {
+			flushGlowSprites()
+		}
+		bm := newBitmap(w, h)
+		if bm == nil {
+			return false
+		}
+		gTranslate(bm.g, m-b.X, m-b.Y)
+		C.og_shadow_only(og(bm.g), opath(path), C.uint32_t(c), C.float(r))
+		gReset(bm.g)
+		e = &glowSpriteEntry{bm, b.X - m, b.Y - m}
+		glowSprites[k] = e
+		glowSpriteBytes += w * h * 4
+	}
+	gImageAlpha(g, e.b.bmp, e.b.w, e.b.h, e.x, e.y, float32(e.b.w), float32(e.b.h), alpha)
 	return true
 }

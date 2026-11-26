@@ -415,6 +415,21 @@ void og_fill_path_glow(OG *g, OPath *p, uint32_t fill, uint32_t glow, float blur
 	CGContextRestoreGState(g->ctx);
 }
 
+// og_shadow_only: only the blurred glow of the path, not the path itself — the path is filled far
+// off to the left and its shadow is cast back exactly onto its place (for the glow sprites)
+void og_shadow_only(OG *g, OPath *p, uint32_t glow, float blur) {
+	CGFloat off = 20000;
+	CGContextSaveGState(g->ctx);
+	CGColorRef gc = color(glow | 0xFF000000u);
+	CGContextSetShadowWithColor(g->ctx, CGSizeMake(off, 0), blur, gc);
+	CGColorRelease(gc);
+	CGContextTranslateCTM(g->ctx, -off, 0);
+	CGContextAddPath(g->ctx, p->p);
+	CGContextSetRGBFillColor(g->ctx, 0, 0, 0, 1);
+	CGContextFillPath(g->ctx);
+	CGContextRestoreGState(g->ctx);
+}
+
 void og_stroke_path(OG *g, OPath *p, OPen *pen) {
 	usePen(g, pen);
 	CGContextAddPath(g->ctx, p->p);

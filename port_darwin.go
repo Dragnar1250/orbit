@@ -182,6 +182,7 @@ func cachedTextPath(f *Font, s string) *textPathEntry {
 	e := &textPathEntry{path: newPath()}
 	addTextPath(e.path, f, s, 0, 0)
 	textPaths[k] = e
+	textPathSet[e.path] = true
 	return e
 }
 
@@ -190,7 +191,13 @@ func flushTextPaths() {
 		freePath(e.path)
 	}
 	textPaths = map[textPathKey]*textPathEntry{}
+	textPathSet = map[uintptr]bool{}
+	flushGlowSprites() // they belong to those paths
 }
+
+// textPathSet: the paths kept in textPaths — only those get glow sprites (a path made and freed
+// at once could come back at the same address as another text)
+var textPathSet = map[uintptr]bool{}
 
 func (e *textPathEntry) size(f *Font, s string) (float32, float32) {
 	if !e.measured {
