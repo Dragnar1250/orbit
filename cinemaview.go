@@ -1367,9 +1367,9 @@ func (f *FullView) cinemaStage(now time.Time, snap MediaSnap, bass float32, line
 	style := clampI(cfg.FsStage-1, 0, len(styleNames)-1)
 	switch cfg.FsEffect {
 	case fxSoftGlow:
-		c.bloomOn = 0.75 * cfg.GlowAmount
+		c.bloomOn = 0.75 * math.Min(cfg.GlowAmount, glowMaxAmt) * bloomTone
 	case fxStrongGlow:
-		c.bloomOn = 1.3 * cfg.GlowAmount
+		c.bloomOn = 1.3 * math.Min(cfg.GlowAmount, glowMaxAmt) * bloomTone
 	default:
 		c.bloomOn = 0
 	}
@@ -1393,9 +1393,9 @@ func (f *FullView) cinemaStage(now time.Time, snap MediaSnap, bass float32, line
 		c.motSx, c.motSy = 1+0.16*c.mot, 1-0.05*c.mot
 	case moGlow:
 		if c.bloomOn > 0 {
-			c.bloomGain = 1 + c.mot*1.4
+			c.bloomGain = 1 + c.mot*1.4*bloomTone
 		} else {
-			c.bloomOn, c.bloomGain = 0.75*math.Max(0.5, cfg.GlowAmount), c.mot*1.6
+			c.bloomOn, c.bloomGain = 0.75*math.Max(0.5, cfg.GlowAmount)*bloomTone, c.mot*1.6
 		}
 	}
 	// a new line: keep the old one to fade it out under the new one (not Flow: it shows it itself)

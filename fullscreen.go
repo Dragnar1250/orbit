@@ -33,7 +33,7 @@ type FullView struct {
 
 	hiKey, hiBusy string
 	hiImg         uintptr
-	hiTries       int       // looked again (Spotify\'s cover may come in later)
+	hiTries       int // looked again (Spotify\'s cover may come in later)
 	hiNext        time.Time
 	hiVer         int
 
@@ -237,7 +237,7 @@ func pruneHiRes(n int) {
 	}
 	pruneGlob("sq-*.jpg", 200) // Spotify queue pictures
 	pruneGlob("bigcover-*.jpg", n)
-	old, _ = filepath.Glob(filepath.Join(appDir(), "cache", "hires2k-*.jpg")) // 1.14–1.23's (iTunes only)
+	old, _ = filepath.Glob(filepath.Join(appDir(), "cache", "hires2k-*.jpg"))   // 1.14–1.23's (iTunes only)
 	old2, _ := filepath.Glob(filepath.Join(appDir(), "cache", "cover2k-*.jpg")) // 1.23.3's (bad Windows match)
 	old = append(old, old2...)
 	for _, p := range old {

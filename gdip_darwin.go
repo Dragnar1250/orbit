@@ -481,3 +481,28 @@ func addTextPath(path uintptr, f *Font, s string, x, y float32) {
 	defer C.free(unsafe.Pointer(p))
 	C.og_text_path(opath(path), f.f, p, n, C.float(x), C.float(y))
 }
+
+// On the Mac the glows stay a glow, not a cloud (1.24.6): the beat's Glow motion makes them
+// brighter more than wider, a strong setting (up to 200 %) widens them only so far, and full
+// screen's bloom is gentler — with Retina's sharp, bright text they read as puffy white blobs.
+const (
+	glowBeatK   = 0.55
+	glowBeatAdd = 0.35
+	glowMaxAmt  = 1.6
+	bloomTone   = 0.6
+)
+
+// strongGlowSoft: Strong glow on the Mac — one wide outline and the letters themselves laid on the
+// soft layer and blurred: a smooth halo. (Four outlines one on another showed as hard grey rings.)
+func strongGlowSoft(g, path uintptr, col uint32, size, amt float32, a float64) bool {
+	if !softBegin(g) {
+		return false
+	}
+	w := size*0.36*amt + 1
+	strokePath(g, path, withAlpha(col|0xFF000000, a*0.42*math.Min(1.2, float64(amt))), w)
+	fillPathColor(g, path, withAlpha(col|0xFF000000, a*0.6))
+	softEnd(g)
+	softBlur(g, float32(math.Max(2, float64(w)*0.42)))
+	fillPathColor(g, path, col)
+	return true
+}

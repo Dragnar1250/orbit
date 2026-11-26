@@ -4129,9 +4129,13 @@ func wordSprite(f *Font, text string, col uint32, effect int) *sprite {
 func drawEffect(g, path uintptr, col uint32, size float32, effect int) {
 	amt := float32(cfg.GlowAmount)
 	if cfg.Motion == moGlow {
-		amt = amt*(1+lyrMotion*1.4) + lyrMotion
+		amt = amt*(1+lyrMotion*glowBeatK) + lyrMotion*glowBeatAdd
 	}
+	amt = min(amt, glowMaxAmt)
 	a := float64(col>>24) / 255
+	if effect == fxStrongGlow && strongGlowSoft(g, path, col, size, amt, a) {
+		return
+	}
 	switch effect {
 	case fxNone:
 		fillPathColor(g, path, col)

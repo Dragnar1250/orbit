@@ -40,3 +40,14 @@ func gImageSrc(g, img uintptr, x, y, w, h, sx, sy, sw, sh float32) {
 
 // fontID: the font, its size and style, as a key
 func fontID(f *Font) string { return fmt.Sprint(f.family, "|", f.size, "|", f.style) }
+
+// the beat's Glow motion and the most a glow may grow (as they always were on Windows)
+const (
+	glowBeatK   = 1.4
+	glowBeatAdd = 1.0
+	glowMaxAmt  = 99
+	bloomTone   = 1.0
+)
+
+// strongGlowSoft: Windows draws Strong glow as four outlines (drawEffect).
+func strongGlowSoft(g, path uintptr, col uint32, size, amt float32, a float64) bool { return false }
