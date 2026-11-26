@@ -466,10 +466,6 @@ func main() {
 	logf("Orbit %s starting (macOS)", appVersion)
 	debug.SetGCPercent(60)
 	debug.SetMemoryLimit(160 << 20)
-	// as many Go threads as the pixel work uses, plus the main one and one spare: with one per core
-	// (10–12 on an M-series Mac) the scheduler spent most of full screen's time waking and parking
-	// idle threads (47 % in the profile), not drawing
-	runtime.GOMAXPROCS(min(runtime.NumCPU(), workers()+2))
 	if f, err := os.OpenFile(filepath.Join(appDir(), "crash.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
 		fmt.Fprintf(f, "=== %s  Orbit %s started ===\n", time.Now().Format("2006-01-02 15:04:05"), appVersion)
 		debug.SetCrashOutput(f, debug.CrashOptions{})
